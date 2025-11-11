@@ -9,6 +9,8 @@ function ProjectsSection() {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [assetsByProject, setAssetsByProject] = useState({});
+    const [uploadingFor, setUploadingFor] = useState(null);
 
     useEffect(() => {
         if (!token) return;
@@ -16,9 +18,7 @@ function ProjectsSection() {
         setLoading(true);
         api
             .get("/projects/", {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
                 setProjects(res.data);
@@ -29,6 +29,25 @@ function ProjectsSection() {
             .finally(() => setLoading(false));
     }, [token]);
 
+    const loadAssets = async (projectId) => {
+        try {
+            const res = await api.get(`/projects/${projectId}/assets`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setAssetsByProject((prev) => ({
+                ...prev,
+                [projectId]: res.data,
+            }));
+        } catch (err) {
+            console.error("Failed to load assets", err);
+        }
+    };
+    useEffect(() => {
+        if (!token || projects.length === 0) return;
+        projects.forEach((project) => {
+            loadAssets(project.id);
+        });
+    }, [token, projects]);
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -42,12 +61,9 @@ function ProjectsSection() {
                     description: description.trim() || null,
                 },
                 {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
+                    headers: { Authorization: `Bearer ${token}` },
                 }
             );
-            // Prepend new project
             setProjects((prev) => [res.data, ...prev]);
             setName("");
             setDescription("");
@@ -60,19 +76,58 @@ function ProjectsSection() {
     };
 
     const handleDelete = async (id) => {
-        const confirm = window.confirm("Delete this project?");
-        if (!confirm) return;
+        const confirmDelete = window.confirm("Delete this project?");
+        if (!confirmDelete) return;
 
         try {
             await api.delete(`/projects/${id}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` },
             });
             setProjects((prev) => prev.filter((p) => p.id !== id));
+            setAssetsByProject((prev) => {
+                const copy = { ...prev };
+                delete copy[id];
+                return copy;
+            });
         } catch (err) {
             console.error("Failed to delete project", err);
             alert("Failed to delete project.");
+        }
+    };
+
+    const handleFileChange = async (projectId, event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setUploadingFor(projectId);
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await api.post(
+                `/projects/${projectId}/assets`,
+                formData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            setAssetsByProject((prev) => {
+                const existing = prev[projectId] || [];
+                return {
+                    ...prev,
+                    [projectId]: [res.data, ...existing],
+                };
+            });
+        } catch (err) {
+            console.error("Failed to upload asset", err);
+            alert("Failed to upload asset.");
+        } finally {
+            setUploadingFor(null);
+            event.target.value = "";
         }
     };
 
@@ -84,6 +139,7 @@ function ProjectsSection() {
         <section style={{ marginTop: "1.5rem" }}>
             <h2 style={{ marginBottom: "0.75rem" }}>Projects</h2>
 
+            {/* Create project form */}
             <form
                 onSubmit={handleCreate}
                 style={{
@@ -94,6 +150,7 @@ function ProjectsSection() {
                     padding: "0.75rem",
                     borderRadius: "8px",
                     border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
                 }}
             >
                 <input
@@ -130,6 +187,8 @@ function ProjectsSection() {
                         border: "none",
                         cursor: "pointer",
                         fontSize: "0.9rem",
+                        backgroundColor: "#111827",
+                        color: "#ffffff",
                         opacity: creating ? 0.7 : 1,
                     }}
                 >
@@ -137,72 +196,161 @@ function ProjectsSection() {
                 </button>
             </form>
 
+            {/* Projects list */}
             {projects.length === 0 ? (
                 <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing design
-                    feedback.
+                    You have no projects yet. Create one to start managing design feedback.
                 </p>
             ) : (
                 <div
                     style={{
                         display: "grid",
                         gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                        gap: "0.75rem",
+                        gap: "0.9rem",
                     }}
                 >
-                    {projects.map((project) => (
-                        <div
-                            key={project.id}
-                            style={{
-                                padding: "0.85rem",
-                                borderRadius: "8px",
-                                border: "1px solid #e0e0e0",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "0.25rem",
-                            }}
-                        >
+                    {projects.map((project) => {
+                        const assets = assetsByProject[project.id] || [];
+
+                        return (
                             <div
+                                key={project.id}
                                 style={{
-                                    fontWeight: 600,
-                                    fontSize: "0.98rem",
+                                    padding: "0.85rem",
+                                    borderRadius: "8px",
+                                    border: "1px solid #e0e0e0",
+                                    backgroundColor: "#ffffff",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.35rem",
                                 }}
                             >
-                                {project.name}
-                            </div>
-                            {project.description && (
                                 <div
                                     style={{
-                                        fontSize: "0.85rem",
-                                        color: "#555",
+                                        fontWeight: 600,
+                                        fontSize: "0.98rem",
                                     }}
                                 >
-                                    {project.description}
+                                    {project.name}
                                 </div>
-                            )}
-                            <div
-                                style={{
-                                    marginTop: "0.35rem",
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                }}
-                            >
-                                <button
-                                    onClick={() => handleDelete(project.id)}
+                                {project.description && (
+                                    <div
+                                        style={{
+                                            fontSize: "0.85rem",
+                                            color: "#555",
+                                        }}
+                                    >
+                                        {project.description}
+                                    </div>
+                                )}
+
+                                {/* Upload input */}
+                                <div
                                     style={{
-                                        padding: "0.25rem 0.6rem",
-                                        fontSize: "0.78rem",
-                                        borderRadius: "4px",
-                                        border: "1px solid #f0b3b3",
-                                        background: "#fff5f5",
-                                        cursor: "pointer",
+                                        marginTop: "0.4rem",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: "0.5rem",
                                     }}
                                 >
-                                    Delete
-                                </button>
+                                    <label
+                                        style={{
+                                            fontSize: "0.78rem",
+                                            padding: "0.25rem 0.6rem",
+                                            borderRadius: "4px",
+                                            border: "1px solid #ccc",
+                                            cursor: "pointer",
+                                            backgroundColor: "#f9fafb",
+                                        }}
+                                    >
+                                        {uploadingFor === project.id
+                                            ? "Uploading..."
+                                            : "Upload asset"}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => handleFileChange(project.id, e)}
+                                            disabled={uploadingFor === project.id}
+                                        />
+                                    </label>
+
+                                    <button
+                                        onClick={() => {
+                                            if (!assets.length) {
+                                                loadAssets(project.id);
+                                            } else {
+                                                // toggle clear
+                                                setAssetsByProject((prev) => ({
+                                                    ...prev,
+                                                    [project.id]: prev[project.id],
+                                                }));
+                                            }
+                                        }}
+                                        style={{
+                                            padding: "0.25rem 0.6rem",
+                                            fontSize: "0.78rem",
+                                            borderRadius: "4px",
+                                            border: "1px solid #e5e7eb",
+                                            backgroundColor: "#f9fafb",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {assets.length ? "Refresh assets" : "Load assets"}
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDelete(project.id)}
+                                        style={{
+                                            padding: "0.25rem 0.6rem",
+                                            fontSize: "0.78rem",
+                                            borderRadius: "4px",
+                                            border: "1px solid #fca5a5",
+                                            backgroundColor: "#fef2f2",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+
+                                {/* Assets thumbnails */}
+                                {assets.length > 0 && (
+                                    <div
+                                        style={{
+                                            marginTop: "0.4rem",
+                                            display: "grid",
+                                            gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
+                                            gap: "0.25rem",
+                                        }}
+                                    >
+                                        {assets.map((asset) => (
+                                            <div
+                                                key={asset.id}
+                                                style={{
+                                                    borderRadius: "4px",
+                                                    overflow: "hidden",
+                                                    border: "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <img
+                                                    src={`http://localhost:8000/uploads/${asset.file_path}`}
+                                                    alt={`Asset ${asset.id}`}
+                                                    style={{
+                                                        width: "100%",
+                                                        height: "60px",
+                                                        objectFit: "cover",
+                                                        display: "block",
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </section>

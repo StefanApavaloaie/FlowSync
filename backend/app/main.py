@@ -1,16 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
 from .config import settings
-from .routers import health, auth, projects
+from .routers import health, auth, projects, assets
 
-# Create tables on startup (OK for dev/MVP)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
-# CORS so frontend (localhost:5173) can call backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
@@ -19,10 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(projects.router)
+app.include_router(assets.router)
+
 
 @app.get("/")
 def root():

@@ -1,3 +1,4 @@
+import os
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+UPLOAD_DIR = "uploads"
 
 
 @router.get("/", response_model = List[schemas.ProjectOut])
@@ -37,7 +40,7 @@ def create_project(
     db.refresh(project)
     return project
 
-@router.delete("/{project_id}", status_code = status.HTTP_204_NO_CONTENT)
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
@@ -49,12 +52,32 @@ def delete_project(
             models.Project.id == project_id,
             models.Project.owner_id == current_user.id,
         )
-    ).first()
+        .first()
+    )
+
     if not project:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Project not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
         )
+
+    assets = (
+        db.query(models.Asset)
+        .filter(models.Asset.project_id == project.id)
+        .all()
+    )
+
+    for asset in assets:
+        if asset.file_path:
+          file_path = os.path.join(UPLOAD_DIR, asset.file_path)
+          if os.path.exists(file_path):
+              try:
+                  os.remove(file_path)
+              except OSError:
+                  pass
+
+        db.delete(asset)
+
     db.delete(project)
     db.commit()
     return

@@ -25,3 +25,14 @@ class ProjectOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AssetOut(BaseModel):
+    id: int
+    project_id: int
+    file_path: str
+    version: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
