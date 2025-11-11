@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
 from .config import settings
-from .routers import health, auth
+from .routers import health, auth, projects
 
 # Create tables on startup (OK for dev/MVP)
 Base.metadata.create_all(bind=engine)
@@ -22,7 +22,7 @@ app.add_middleware(
 # Routers
 app.include_router(health.router)
 app.include_router(auth.router)
-
+app.include_router(projects.router)
 
 @app.get("/")
 def root():

@@ -1,7 +1,7 @@
 from typing import Generator
 from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
@@ -56,3 +56,16 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+def get_current_user_from_header(
+        authorization: str = Header(None),
+        db: Session = Depends(get_db),
+) -> models.User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail = "Missing or invalid Authorization header",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    return get_current_user(token = token, db=db) 
