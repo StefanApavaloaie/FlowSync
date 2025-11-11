@@ -4,18 +4,27 @@ import { useAuth } from "../context/AuthContext";
 
 function ProjectsSection() {
     const { token } = useAuth();
+
     const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [assetsByProject, setAssetsByProject] = useState({});
+    const [loadingProjects, setLoadingProjects] = useState(true);
+
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [assetsByProject, setAssetsByProject] = useState({});
     const [uploadingFor, setUploadingFor] = useState(null);
 
+    const [activeAsset, setActiveAsset] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+    const [loadingComments, setLoadingComments] = useState(false);
+    const [submittingComment, setSubmittingComment] = useState(false);
+
+    // Load projects
     useEffect(() => {
         if (!token) return;
 
-        setLoading(true);
+        setLoadingProjects(true);
         api
             .get("/projects/", {
                 headers: { Authorization: `Bearer ${token}` },
@@ -26,8 +35,20 @@ function ProjectsSection() {
             .catch((err) => {
                 console.error("Failed to load projects", err);
             })
-            .finally(() => setLoading(false));
+            .finally(() => setLoadingProjects(false));
     }, [token]);
+
+    // Auto-load assets for each project once
+    useEffect(() => {
+        if (!token || projects.length === 0) return;
+
+        projects.forEach((project) => {
+            if (!assetsByProject[project.id]) {
+                loadAssets(project.id);
+            }
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, projects]);
 
     const loadAssets = async (projectId) => {
         try {
@@ -42,12 +63,7 @@ function ProjectsSection() {
             console.error("Failed to load assets", err);
         }
     };
-    useEffect(() => {
-        if (!token || projects.length === 0) return;
-        projects.forEach((project) => {
-            loadAssets(project.id);
-        });
-    }, [token, projects]);
+
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -83,12 +99,21 @@ function ProjectsSection() {
             await api.delete(`/projects/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
+
             setProjects((prev) => prev.filter((p) => p.id !== id));
+
             setAssetsByProject((prev) => {
                 const copy = { ...prev };
                 delete copy[id];
                 return copy;
             });
+
+            if (activeAsset && assetsByProject[id]) {
+                const stillHas = assetsByProject[id].some(
+                    (a) => a.id === activeAsset.id
+                );
+                if (stillHas) setActiveAsset(null);
+            }
         } catch (err) {
             console.error("Failed to delete project", err);
             alert("Failed to delete project.");
@@ -100,7 +125,6 @@ function ProjectsSection() {
         if (!file) return;
 
         setUploadingFor(projectId);
-
         const formData = new FormData();
         formData.append("file", file);
 
@@ -109,9 +133,7 @@ function ProjectsSection() {
                 `/projects/${projectId}/assets`,
                 formData,
                 {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
+                    headers: { Authorization: `Bearer ${token}` },
                 }
             );
 
@@ -131,7 +153,52 @@ function ProjectsSection() {
         }
     };
 
-    if (loading) {
+    const openAssetViewer = async (asset) => {
+        setActiveAsset(asset);
+        setComments([]);
+
+        if (!asset) return;
+
+        setLoadingComments(true);
+        try {
+            const res = await api.get(`/assets/${asset.id}/comments`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setComments(res.data);
+        } catch (err) {
+            console.error("Failed to load comments", err);
+        } finally {
+            setLoadingComments(false);
+        }
+    };
+
+    const submitComment = async (e) => {
+        e.preventDefault();
+        if (!activeAsset) return;
+
+        const content = newComment.trim();
+        if (!content) return;
+
+        setSubmittingComment(true);
+        try {
+            const res = await api.post(
+                `/assets/${activeAsset.id}/comments`,
+                { content },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            setComments((prev) => [...prev, res.data]);
+            setNewComment("");
+        } catch (err) {
+            console.error("Failed to add comment", err);
+            alert("Failed to add comment.");
+        } finally {
+            setSubmittingComment(false);
+        }
+    };
+
+    if (loadingProjects) {
         return <p>Loading projects...</p>;
     }
 
@@ -196,10 +263,11 @@ function ProjectsSection() {
                 </button>
             </form>
 
-            {/* Projects list */}
+            {/* Projects grid */}
             {projects.length === 0 ? (
                 <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing design feedback.
+                    You have no projects yet. Create one to start managing design
+                    feedback.
                 </p>
             ) : (
                 <div
@@ -244,7 +312,6 @@ function ProjectsSection() {
                                     </div>
                                 )}
 
-                                {/* Upload input */}
                                 <div
                                     style={{
                                         marginTop: "0.4rem",
@@ -277,17 +344,7 @@ function ProjectsSection() {
                                     </label>
 
                                     <button
-                                        onClick={() => {
-                                            if (!assets.length) {
-                                                loadAssets(project.id);
-                                            } else {
-                                                // toggle clear
-                                                setAssetsByProject((prev) => ({
-                                                    ...prev,
-                                                    [project.id]: prev[project.id],
-                                                }));
-                                            }
-                                        }}
+                                        onClick={() => loadAssets(project.id)}
                                         style={{
                                             padding: "0.25rem 0.6rem",
                                             fontSize: "0.78rem",
@@ -297,7 +354,7 @@ function ProjectsSection() {
                                             cursor: "pointer",
                                         }}
                                     >
-                                        {assets.length ? "Refresh assets" : "Load assets"}
+                                        Refresh assets
                                     </button>
 
                                     <button
@@ -321,7 +378,8 @@ function ProjectsSection() {
                                         style={{
                                             marginTop: "0.4rem",
                                             display: "grid",
-                                            gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
+                                            gridTemplateColumns:
+                                                "repeat(auto-fill, minmax(60px, 1fr))",
                                             gap: "0.25rem",
                                         }}
                                     >
@@ -337,11 +395,13 @@ function ProjectsSection() {
                                                 <img
                                                     src={`http://localhost:8000/uploads/${asset.file_path}`}
                                                     alt={`Asset ${asset.id}`}
+                                                    onClick={() => openAssetViewer(asset)}
                                                     style={{
                                                         width: "100%",
                                                         height: "60px",
                                                         objectFit: "cover",
                                                         display: "block",
+                                                        cursor: "pointer",
                                                     }}
                                                 />
                                             </div>
@@ -351,6 +411,184 @@ function ProjectsSection() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Asset viewer + comments modal */}
+            {activeAsset && (
+                <div
+                    onClick={() => setActiveAsset(null)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        backgroundColor: "rgba(0,0,0,0.45)",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 40,
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: "min(1000px, 96vw)",
+                            height: "85vh", // fixed modal height
+                            backgroundColor: "#ffffff",
+                            borderRadius: "10px",
+                            padding: "1rem",
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 2.2fr) minmax(260px, 1fr)",
+                            gap: "0.75rem",
+                            boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
+                        }}
+                    >
+                        {/* LEFT: image, scrollable if tall */}
+                        <div
+                            style={{
+                                height: "100%",
+                                borderRadius: "6px",
+                                overflow: "auto",
+                                border: "1px solid #e5e7eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "#f9fafb",
+                            }}
+                        >
+                            <img
+                                src={`http://localhost:8000/uploads/${activeAsset.file_path}`}
+                                alt={`Asset ${activeAsset.id}`}
+                                style={{
+                                    maxWidth: "100%",
+                                    maxHeight: "100%",
+                                    objectFit: "contain",
+                                    display: "block",
+                                }}
+                            />
+                        </div>
+
+                        {/* RIGHT: comments */}
+                        <div
+                            style={{
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.5rem",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <h3
+                                    style={{
+                                        margin: 0,
+                                        fontSize: "1rem",
+                                    }}
+                                >
+                                    Comments
+                                </h3>
+                                <button
+                                    onClick={() => setActiveAsset(null)}
+                                    style={{
+                                        border: "none",
+                                        background: "transparent",
+                                        cursor: "pointer",
+                                        fontSize: "0.9rem",
+                                        color: "#6b7280",
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div
+                                style={{
+                                    flexGrow: 1,
+                                    overflowY: "auto",
+                                    paddingRight: "0.25rem",
+                                    borderRadius: "4px",
+                                    border: "1px solid #f3f4f6",
+                                    padding: "0.4rem",
+                                    fontSize: "0.85rem",
+                                    backgroundColor: "#fafafa",
+                                }}
+                            >
+                                {loadingComments ? (
+                                    <p style={{ margin: 0, color: "#6b7280" }}>
+                                        Loading comments...
+                                    </p>
+                                ) : comments.length === 0 ? (
+                                    <p style={{ margin: 0, color: "#6b7280" }}>
+                                        No comments yet. Start the discussion.
+                                    </p>
+                                ) : (
+                                    comments.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            style={{
+                                                marginBottom: "0.35rem",
+                                                paddingBottom: "0.25rem",
+                                                borderBottom: "1px solid #e5e7eb",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: "0.75rem",
+                                                    color: "#9ca3af",
+                                                }}
+                                            >
+                                                #{c.id}
+                                            </div>
+                                            <div>{c.content}</div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <form
+                                onSubmit={submitComment}
+                                style={{ display: "flex", gap: "0.35rem" }}
+                            >
+                                <input
+                                    type="text"
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    placeholder="Add a comment..."
+                                    style={{
+                                        flexGrow: 1,
+                                        padding: "0.35rem 0.6rem",
+                                        borderRadius: "4px",
+                                        border: "1px solid #d1d5db",
+                                        fontSize: "0.85rem",
+                                    }}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={submittingComment || !newComment.trim()}
+                                    style={{
+                                        padding: "0.35rem 0.7rem",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        fontSize: "0.8rem",
+                                        cursor:
+                                            submittingComment || !newComment.trim()
+                                                ? "default"
+                                                : "pointer",
+                                        backgroundColor: "#111827",
+                                        color: "#ffffff",
+                                        opacity:
+                                            submittingComment || !newComment.trim() ? 0.6 : 1,
+                                    }}
+                                >
+                                    {submittingComment ? "Sending..." : "Send"}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             )}
         </section>

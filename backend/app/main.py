@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
 from .config import settings
-from .routers import health, auth, projects, assets
+from .routers import health, auth, projects, assets, comments
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,12 +18,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+# Routers
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(assets.router)
+app.include_router(comments.router)
 
 
 @app.get("/")

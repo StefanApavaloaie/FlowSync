@@ -57,15 +57,20 @@ def get_current_user(
 
     return user
 
+
 def get_current_user_from_header(
-        authorization: str = Header(None),
-        db: Session = Depends(get_db),
+    authorization: str = Header(None),
+    db: Session = Depends(get_db),
 ) -> models.User:
+    """
+    Extract JWT from Authorization header.
+    Expects: Authorization: Bearer <token>
+    """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
-            status_code = status.HTTP_401_UNAUTHORIZED,
-            detail = "Missing or invalid Authorization header",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header",
         )
 
     token = authorization.split(" ", 1)[1].strip()
-    return get_current_user(token = token, db=db) 
+    return get_current_user(token=token, db=db)

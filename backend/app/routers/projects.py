@@ -1,5 +1,6 @@
 import os
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 UPLOAD_DIR = "uploads"
 
 
-@router.get("/", response_model = List[schemas.ProjectOut])
+@router.get("/", response_model=List[schemas.ProjectOut])
 def list_projects(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
@@ -24,21 +25,27 @@ def list_projects(
     )
     return projects
 
-@router.post("/", response_model=schemas.ProjectOut, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/",
+    response_model=schemas.ProjectOut,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_project(
     payload: schemas.ProjectCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
     project = models.Project(
-        name = payload.name,
-        description = payload.description,
-        owner_id = current_user.id,
+        name=payload.name,
+        description=payload.description,
+        owner_id=current_user.id,
     )
     db.add(project)
     db.commit()
     db.refresh(project)
     return project
+
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
@@ -46,6 +53,7 @@ def delete_project(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
+    # Ensure project belongs to current user
     project = (
         db.query(models.Project)
         .filter(
@@ -61,23 +69,38 @@ def delete_project(
             detail="Project not found",
         )
 
+    # Fetch assets for this project
     assets = (
         db.query(models.Asset)
         .filter(models.Asset.project_id == project.id)
         .all()
     )
 
+    # For each asset: delete its comments, then delete file + asset
     for asset in assets:
-        if asset.file_path:
-          file_path = os.path.join(UPLOAD_DIR, asset.file_path)
-          if os.path.exists(file_path):
-              try:
-                  os.remove(file_path)
-              except OSError:
-                  pass
+        # Delete comments for this asset
+        comments = (
+            db.query(models.Comment)
+            .filter(models.Comment.asset_id == asset.id)
+            .all()
+        )
+        for comment in comments:
+            db.delete(comment)
 
+        # Delete associated file if it exists
+        if asset.file_path:
+            file_path = os.path.join(UPLOAD_DIR, asset.file_path)
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    # Ignore file delete errors in this MVP
+                    pass
+
+        # Delete asset record
         db.delete(asset)
 
+    # Finally, delete the project itself
     db.delete(project)
     db.commit()
     return

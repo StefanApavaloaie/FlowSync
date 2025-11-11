@@ -84,7 +84,7 @@ async def upload_asset(
 
     asset = models.Asset(
         project_id=project.id,
-        file_path=filename,  # store relative name only
+        file_path=filename,  # relative filename
         version=current_count + 1,
     )
 
