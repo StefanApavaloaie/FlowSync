@@ -1,0 +1,13 @@
+# Python
+venv/
+__pycache__/
+
+# Node
+node_modules/
+
+# Local DB
+flowsync.db
+
+# Secrets
+.env
+backend/.env
