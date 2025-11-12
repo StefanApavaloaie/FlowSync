@@ -20,6 +20,9 @@ function ProjectsSection() {
     const [loadingComments, setLoadingComments] = useState(false);
     const [submittingComment, setSubmittingComment] = useState(false);
 
+    const [aiSuggestions, setAiSuggestions] = useState(null);
+    const [loadingAi, setLoadingAi] = useState(false);
+
     // Load projects
     useEffect(() => {
         if (!token) return;
@@ -156,6 +159,7 @@ function ProjectsSection() {
     const openAssetViewer = async (asset) => {
         setActiveAsset(asset);
         setComments([]);
+        setAiSuggestions(null);
 
         if (!asset) return;
 
@@ -195,6 +199,27 @@ function ProjectsSection() {
             alert("Failed to add comment.");
         } finally {
             setSubmittingComment(false);
+        }
+    };
+
+    const fetchAiSuggestions = async () => {
+        if (!activeAsset) return;
+        setLoadingAi(true);
+        setAiSuggestions(null);
+
+        try {
+            const res = await api.get(
+                `/assets/${activeAsset.id}/ai-suggestions`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            setAiSuggestions(res.data);
+        } catch (err) {
+            console.error("Failed to load AI suggestions", err);
+            alert("Failed to load AI suggestions.");
+        } finally {
+            setLoadingAi(false);
         }
     };
 
@@ -266,8 +291,7 @@ function ProjectsSection() {
             {/* Projects grid */}
             {projects.length === 0 ? (
                 <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing design
-                    feedback.
+                    You have no projects yet. Create one to start managing design feedback.
                 </p>
             ) : (
                 <div
@@ -414,7 +438,7 @@ function ProjectsSection() {
                 </div>
             )}
 
-            {/* Asset viewer + comments modal */}
+            {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
                 <div
                     onClick={() => setActiveAsset(null)}
@@ -432,7 +456,7 @@ function ProjectsSection() {
                         onClick={(e) => e.stopPropagation()}
                         style={{
                             width: "min(1000px, 96vw)",
-                            height: "85vh", // fixed modal height
+                            height: "85vh",
                             backgroundColor: "#ffffff",
                             borderRadius: "10px",
                             padding: "1rem",
@@ -442,7 +466,7 @@ function ProjectsSection() {
                             boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
                         }}
                     >
-                        {/* LEFT: image, scrollable if tall */}
+                        {/* LEFT: image */}
                         <div
                             style={{
                                 height: "100%",
@@ -467,7 +491,7 @@ function ProjectsSection() {
                             />
                         </div>
 
-                        {/* RIGHT: comments */}
+                        {/* RIGHT: comments + AI */}
                         <div
                             style={{
                                 height: "100%",
@@ -481,6 +505,7 @@ function ProjectsSection() {
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center",
+                                    gap: "0.5rem",
                                 }}
                             >
                                 <h3
@@ -491,20 +516,78 @@ function ProjectsSection() {
                                 >
                                     Comments
                                 </h3>
-                                <button
-                                    onClick={() => setActiveAsset(null)}
-                                    style={{
-                                        border: "none",
-                                        background: "transparent",
-                                        cursor: "pointer",
-                                        fontSize: "0.9rem",
-                                        color: "#6b7280",
-                                    }}
-                                >
-                                    ✕
-                                </button>
+
+                                <div style={{ display: "flex", gap: "0.4rem" }}>
+                                    <button
+                                        onClick={fetchAiSuggestions}
+                                        disabled={loadingAi}
+                                        style={{
+                                            padding: "0.25rem 0.5rem",
+                                            borderRadius: "4px",
+                                            border: "1px solid #111827",
+                                            fontSize: "0.75rem",
+                                            backgroundColor: "#111827",
+                                            color: "#ffffff",
+                                            cursor: loadingAi ? "default" : "pointer",
+                                            opacity: loadingAi ? 0.7 : 1,
+                                        }}
+                                    >
+                                        {loadingAi ? "Analyzing..." : "AI suggestions"}
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveAsset(null)}
+                                        style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            cursor: "pointer",
+                                            fontSize: "0.9rem",
+                                            color: "#6b7280",
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
 
+                            {/* AI suggestions panel */}
+                            {aiSuggestions && (
+                                <div
+                                    style={{
+                                        borderRadius: "4px",
+                                        border: "1px solid #e5e7eb",
+                                        padding: "0.4rem",
+                                        fontSize: "0.78rem",
+                                        backgroundColor: "#f9fafb",
+                                        maxHeight: "28%",
+                                        overflowY: "auto",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 600,
+                                            marginBottom: "0.25rem",
+                                            fontSize: "0.8rem",
+                                        }}
+                                    >
+                                        Automated visual review
+                                    </div>
+                                    <ul
+                                        style={{
+                                            paddingLeft: "1rem",
+                                            margin: 0,
+                                        }}
+                                    >
+                                        {aiSuggestions.suggestions.map((s, idx) => (
+                                            <li key={idx} style={{ marginBottom: "0.15rem" }}>
+                                                {s}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Comments list */}
                             <div
                                 style={{
                                     flexGrow: 1,
@@ -549,6 +632,7 @@ function ProjectsSection() {
                                 )}
                             </div>
 
+                            {/* Add comment */}
                             <form
                                 onSubmit={submitComment}
                                 style={{ display: "flex", gap: "0.35rem" }}

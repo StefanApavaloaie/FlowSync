@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
 from .config import settings
-from .routers import health, auth, projects, assets, comments
+from .routers import ai, health, auth, projects, assets, comments
 
 Base.metadata.create_all(bind=engine)
 
@@ -27,6 +27,7 @@ app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(assets.router)
 app.include_router(comments.router)
+app.include_router(ai.router)
 
 
 @app.get("/")
