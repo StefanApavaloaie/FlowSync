@@ -22,6 +22,7 @@ function ProjectsSection() {
 
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
+    const [showAi, setShowAi] = useState(false); // NEW: controls visibility of the AI panel
 
     // Load projects
     useEffect(() => {
@@ -160,6 +161,7 @@ function ProjectsSection() {
         setActiveAsset(asset);
         setComments([]);
         setAiSuggestions(null);
+        setShowAi(false); // reset AI panel when opening another asset
 
         if (!asset) return;
 
@@ -220,6 +222,18 @@ function ProjectsSection() {
             alert("Failed to load AI suggestions.");
         } finally {
             setLoadingAi(false);
+        }
+    };
+
+    // NEW: button handler that either fetches or toggles visibility
+    const handleAiButtonClick = async () => {
+        if (!activeAsset || loadingAi) return;
+
+        if (!aiSuggestions) {
+            await fetchAiSuggestions();
+            setShowAi(true);
+        } else {
+            setShowAi((prev) => !prev);
         }
     };
 
@@ -519,7 +533,7 @@ function ProjectsSection() {
 
                                 <div style={{ display: "flex", gap: "0.4rem" }}>
                                     <button
-                                        onClick={fetchAiSuggestions}
+                                        onClick={handleAiButtonClick}
                                         disabled={loadingAi}
                                         style={{
                                             padding: "0.25rem 0.5rem",
@@ -530,9 +544,17 @@ function ProjectsSection() {
                                             color: "#ffffff",
                                             cursor: loadingAi ? "default" : "pointer",
                                             opacity: loadingAi ? 0.7 : 1,
+                                            width: "10rem",
+                                            height: "2rem",
                                         }}
                                     >
-                                        {loadingAi ? "Analyzing..." : "AI suggestions"}
+                                        {loadingAi
+                                            ? "Analyzing..."
+                                            : aiSuggestions
+                                                ? showAi
+                                                    ? "Hide AI suggestions ✨"
+                                                    : "Show AI suggestions ✨"
+                                                : " Show AI suggestions ✨"}
                                     </button>
 
                                     <button
@@ -551,7 +573,7 @@ function ProjectsSection() {
                             </div>
 
                             {/* AI suggestions panel */}
-                            {aiSuggestions && (
+                            {aiSuggestions && showAi && (
                                 <div
                                     style={{
                                         borderRadius: "4px",
