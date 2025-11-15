@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
 from .config import settings
-from .routers import ai, health, auth, projects, assets, comments
+from .routers import health, auth, projects, assets, comments, ai
 
 Base.metadata.create_all(bind=engine)
 

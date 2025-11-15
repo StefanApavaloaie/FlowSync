@@ -6,23 +6,16 @@ from .database import Base
 
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-
-    # Nullable: we support Google OAuth users without local password
-    password_hash = Column(String, nullable=True)
-
-    # For Google OAuth binding
-    google_id = Column(String, unique=True, index=True, nullable=True)
-
-    # Name displayed in FlowSync UI
     display_name = Column(String, nullable=True)
-
+    picture = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    projects = relationship("Project", back_populates="owner")
-
+    projects = relationship(
+        "Project",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
 
 class Project(Base):
     __tablename__ = "projects"
