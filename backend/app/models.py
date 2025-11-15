@@ -6,16 +6,21 @@ from .database import Base
 
 class User(Base):
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     display_name = Column(String, nullable=True)
     picture = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
     projects = relationship(
         "Project",
         back_populates="owner",
         cascade="all, delete-orphan",
     )
+    # NEW: link back to comments
+    comments = relationship("Comment", back_populates="user")
+
 
 class Project(Base):
     __tablename__ = "projects"
@@ -53,3 +58,5 @@ class Comment(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     asset = relationship("Asset", back_populates="comments")
+    # NEW: author info
+    user = relationship("User", back_populates="comments")

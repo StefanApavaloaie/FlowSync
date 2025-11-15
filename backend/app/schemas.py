@@ -48,6 +48,7 @@ class CommentOut(BaseModel):
     user_id: int
     content: str
     created_at: datetime
+    user: UserOut | None = None   # NEW
 
     class Config:
         from_attributes = True

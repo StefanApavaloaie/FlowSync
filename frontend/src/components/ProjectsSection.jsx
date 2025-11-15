@@ -22,7 +22,7 @@ function ProjectsSection() {
 
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
-    const [showAi, setShowAi] = useState(false); // NEW: controls visibility of the AI panel
+    const [showAi, setShowAi] = useState(false); // controls visibility of the AI panel
 
     // Load projects
     useEffect(() => {
@@ -225,7 +225,7 @@ function ProjectsSection() {
         }
     };
 
-    // NEW: button handler that either fetches or toggles visibility
+    // button handler that either fetches or toggles visibility
     const handleAiButtonClick = async () => {
         if (!activeAsset || loadingAi) return;
 
@@ -234,6 +234,41 @@ function ProjectsSection() {
             setShowAi(true);
         } else {
             setShowAi((prev) => !prev);
+        }
+    };
+
+    // delete a single comment (backend allows only author to delete)
+    const handleDeleteComment = async (commentId) => {
+        if (!activeAsset) return;
+
+        const confirmDelete = window.confirm("Delete this comment?");
+        if (!confirmDelete) return;
+
+        try {
+            await api.delete(
+                `/assets/${activeAsset.id}/comments/${commentId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            setComments((prev) => prev.filter((c) => c.id !== commentId));
+        } catch (err) {
+            console.error("Failed to delete comment", err);
+            const status = err?.response?.status;
+            if (status === 403) {
+                alert("You can only delete your own comments.");
+            } else {
+                alert("Failed to delete comment.");
+            }
+        }
+    };
+
+    const formatDateTime = (iso) => {
+        if (!iso) return "";
+        try {
+            return new Date(iso).toLocaleString();
+        } catch {
+            return "";
         }
     };
 
@@ -305,7 +340,8 @@ function ProjectsSection() {
             {/* Projects grid */}
             {projects.length === 0 ? (
                 <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing design feedback.
+                    You have no projects yet. Create one to start managing design
+                    feedback.
                 </p>
             ) : (
                 <div
@@ -376,7 +412,9 @@ function ProjectsSection() {
                                             type="file"
                                             accept="image/*"
                                             style={{ display: "none" }}
-                                            onChange={(e) => handleFileChange(project.id, e)}
+                                            onChange={(e) =>
+                                                handleFileChange(project.id, e)
+                                            }
                                             disabled={uploadingFor === project.id}
                                         />
                                     </label>
@@ -464,6 +502,8 @@ function ProjectsSection() {
                         justifyContent: "center",
                         alignItems: "center",
                         zIndex: 40,
+                        padding: "1rem 0",
+                        overflowY: "auto", // key to avoid “stretched” look
                     }}
                 >
                     <div
@@ -552,9 +592,9 @@ function ProjectsSection() {
                                             ? "Analyzing..."
                                             : aiSuggestions
                                                 ? showAi
-                                                    ? "Hide AI suggestions ✨"
-                                                    : "Show AI suggestions ✨"
-                                                : " Show AI suggestions ✨"}
+                                                    ? "Hide AI Suggestions"
+                                                    : "Show AI Suggestions"
+                                                : "AI Suggestions"}
                                     </button>
 
                                     <button
@@ -631,26 +671,64 @@ function ProjectsSection() {
                                         No comments yet. Start the discussion.
                                     </p>
                                 ) : (
-                                    comments.map((c) => (
-                                        <div
-                                            key={c.id}
-                                            style={{
-                                                marginBottom: "0.35rem",
-                                                paddingBottom: "0.25rem",
-                                                borderBottom: "1px solid #e5e7eb",
-                                            }}
-                                        >
+                                    comments.map((c) => {
+                                        const author =
+                                            c.user?.display_name ||
+                                            c.user?.email ||
+                                            "Unknown user";
+
+                                        return (
                                             <div
+                                                key={c.id}
                                                 style={{
-                                                    fontSize: "0.75rem",
-                                                    color: "#9ca3af",
+                                                    marginBottom: "0.35rem",
+                                                    paddingBottom: "0.25rem",
+                                                    borderBottom: "1px solid #e5e7eb",
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    gap: "0.5rem",
                                                 }}
                                             >
-                                                #{c.id}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div
+                                                        style={{
+                                                            fontSize: "0.8rem",
+                                                            fontWeight: 500,
+                                                            color: "#374151",
+                                                        }}
+                                                    >
+                                                        {author}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: "0.72rem",
+                                                            color: "#9ca3af",
+                                                            marginBottom: "0.15rem",
+                                                        }}
+                                                    >
+                                                        {formatDateTime(c.created_at)}
+                                                    </div>
+                                                    <div>{c.content}</div>
+                                                </div>
+
+                                                <button
+                                                    onClick={() =>
+                                                        handleDeleteComment(c.id)
+                                                    }
+                                                    style={{
+                                                        border: "none",
+                                                        background: "transparent",
+                                                        color: "#ef4444",
+                                                        fontSize: "0.75rem",
+                                                        cursor: "pointer",
+                                                        whiteSpace: "nowrap",
+                                                    }}
+                                                >
+                                                    Delete
+                                                </button>
                                             </div>
-                                            <div>{c.content}</div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
 
@@ -687,7 +765,9 @@ function ProjectsSection() {
                                         backgroundColor: "#111827",
                                         color: "#ffffff",
                                         opacity:
-                                            submittingComment || !newComment.trim() ? 0.6 : 1,
+                                            submittingComment || !newComment.trim()
+                                                ? 0.6
+                                                : 1,
                                     }}
                                 >
                                     {submittingComment ? "Sending..." : "Send"}

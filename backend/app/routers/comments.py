@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload  # joinedload added
 
 from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
@@ -47,6 +47,7 @@ def list_comments(
 
     comments = (
         db.query(models.Comment)
+        .options(joinedload(models.Comment.user))  # load author
         .filter(models.Comment.asset_id == asset_id)
         .order_by(models.Comment.created_at.asc())
         .all()
@@ -83,3 +84,39 @@ def add_comment(
     db.commit()
     db.refresh(comment)
     return comment
+
+
+# NEW: delete comment (only author is allowed)
+@router.delete(
+    "/{asset_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_comment(
+    asset_id: int,
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    comment = (
+        db.query(models.Comment)
+        .filter(
+            models.Comment.id == comment_id,
+            models.Comment.asset_id == asset_id,
+        )
+        .first()
+    )
+
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found",
+        )
+
+    if comment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
+        )
+
+    db.delete(comment)
+    db.commit()
