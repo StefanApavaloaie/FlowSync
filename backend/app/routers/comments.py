@@ -9,14 +9,14 @@ from ..deps import get_db, get_current_user_from_header
 router = APIRouter(prefix="/assets", tags=["comments"])
 
 
-def _get_project_role_for_asset(
+def _get_asset_with_access_or_404(
     db: Session,
     user_id: int,
     asset_id: int,
-) -> tuple[models.Asset, str]:
+) -> tuple[models.Asset, models.Project]:
     """
-    Returns (asset, role) where role is 'owner' or 'collaborator'.
-    Raises 404 if asset/project not found, 403 if user is not a member.
+    Ensure the asset exists and user has access via project
+    (owner or participant).
     """
     asset = (
         db.query(models.Asset)
@@ -33,9 +33,9 @@ def _get_project_role_for_asset(
     project = asset.project
 
     if project.owner_id == user_id:
-        return asset, "owner"
+        return asset, project
 
-    participant = (
+    membership = (
         db.query(models.ProjectParticipant)
         .filter(
             models.ProjectParticipant.project_id == project.id,
@@ -43,13 +43,13 @@ def _get_project_role_for_asset(
         )
         .first()
     )
-    if participant:
-        return asset, "collaborator"
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this asset",
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="You are not a member of this project.",
-    )
+    return asset, project
 
 
 @router.get(
@@ -61,11 +61,11 @@ def list_comments(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    # Owner or collaborator can see comments
-    _asset, _role = _get_project_role_for_asset(db, current_user.id, asset_id)
+    _asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     comments = (
         db.query(models.Comment)
+        .join(models.User, models.Comment.user_id == models.User.id)
         .filter(models.Comment.asset_id == asset_id)
         .order_by(models.Comment.created_at.asc())
         .all()
@@ -84,8 +84,7 @@ def add_comment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    # Owner or collaborator can add comments
-    _asset, _role = _get_project_role_for_asset(db, current_user.id, asset_id)
+    _asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     content = (payload.content or "").strip()
     if not content:
@@ -115,11 +114,7 @@ def delete_comment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    - Owner: can delete any comment on assets in their project.
-    - Collaborator: can delete only comments they authored.
-    """
-    asset, role = _get_project_role_for_asset(db, current_user.id, asset_id)
+    asset, project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     comment = (
         db.query(models.Comment)
@@ -135,10 +130,11 @@ def delete_comment(
             detail="Comment not found",
         )
 
-    if role != "owner" and comment.user_id != current_user.id:
+    # Allow deletion if current user is comment author OR project owner
+    if comment.user_id != current_user.id and project.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own comments.",
+            detail="You are not allowed to delete this comment",
         )
 
     db.delete(comment)

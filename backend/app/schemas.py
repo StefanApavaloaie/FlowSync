@@ -29,6 +29,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     created_at: datetime
+    owner_id: int  # NEW: so frontend knows who owns it
 
     class Config:
         from_attributes = True
@@ -54,7 +55,7 @@ class ProjectParticipantOut(BaseModel):
 class AssetOut(BaseModel):
     id: int
     project_id: int
-    user_id: int          # NEW: who uploaded this asset
+    user_id: int          # NEW
     file_path: str
     version: int
     created_at: datetime
@@ -95,6 +96,23 @@ class ProjectInviteOut(BaseModel):
     invited_email: EmailStr
     status: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectInviteWithDetailsOut(BaseModel):
+    """
+    For notifications: includes project and inviting user.
+    """
+
+    id: int
+    project_id: int
+    invited_email: EmailStr
+    status: str
+    created_at: datetime
+    project: ProjectOut
+    invited_by: UserOut
 
     class Config:
         from_attributes = True

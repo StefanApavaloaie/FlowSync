@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
-function ProjectsSection() {
-    const { token, user } = useAuth(); // current user (id, email, display_name)
+function ProjectsSection({ refreshKey = 0 }) {
+    const { token, user } = useAuth();
 
-    const [projects, setProjects] = useState([]);
+    const [ownedProjects, setOwnedProjects] = useState([]);
+    const [sharedProjects, setSharedProjects] = useState([]);
     const [assetsByProject, setAssetsByProject] = useState({});
     const [loadingProjects, setLoadingProjects] = useState(true);
 
@@ -24,37 +25,47 @@ function ProjectsSection() {
 
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
-    const [showAi, setShowAi] = useState(false); // controls visibility of the AI panel
+    const [showAi, setShowAi] = useState(false);
 
-    // Load projects
+    // per-project invite input
+    const [inviteEmails, setInviteEmails] = useState({});
+
+    // Load owned + shared projects
     useEffect(() => {
         if (!token) return;
 
         setLoadingProjects(true);
-        api
-            .get("/projects/", {
+        Promise.all([
+            api.get("/projects/", {
                 headers: { Authorization: `Bearer ${token}` },
-            })
-            .then((res) => {
-                setProjects(res.data);
+            }),
+            api.get("/projects/shared-with-me", {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ])
+            .then(([ownedRes, sharedRes]) => {
+                setOwnedProjects(ownedRes.data);
+                setSharedProjects(sharedRes.data);
             })
             .catch((err) => {
                 console.error("Failed to load projects", err);
             })
             .finally(() => setLoadingProjects(false));
-    }, [token]);
+    }, [token, refreshKey]);
 
-    // Auto-load assets for each project once
+    // Auto-load assets for each project (owned + shared) once
     useEffect(() => {
-        if (!token || projects.length === 0) return;
+        if (!token) return;
+        const all = [...ownedProjects, ...sharedProjects];
+        if (all.length === 0) return;
 
-        projects.forEach((project) => {
+        all.forEach((project) => {
             if (!assetsByProject[project.id]) {
                 loadAssets(project.id);
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, projects]);
+    }, [token, ownedProjects, sharedProjects]);
 
     const loadAssets = async (projectId) => {
         try {
@@ -86,7 +97,7 @@ function ProjectsSection() {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
-            setProjects((prev) => [res.data, ...prev]);
+            setOwnedProjects((prev) => [res.data, ...prev]);
             setName("");
             setDescription("");
         } catch (err) {
@@ -106,7 +117,7 @@ function ProjectsSection() {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            setProjects((prev) => prev.filter((p) => p.id !== id));
+            setOwnedProjects((prev) => prev.filter((p) => p.id !== id));
 
             setAssetsByProject((prev) => {
                 const copy = { ...prev };
@@ -163,7 +174,7 @@ function ProjectsSection() {
         setActiveAsset(asset);
         setComments([]);
         setAiSuggestions(null);
-        setShowAi(false); // reset AI panel when opening another asset
+        setShowAi(false);
 
         if (!asset) return;
 
@@ -206,7 +217,6 @@ function ProjectsSection() {
         }
     };
 
-    // delete comment (only your own, UI-wise – backend enforces too)
     const handleDeleteComment = async (commentId) => {
         if (!activeAsset) return;
 
@@ -228,7 +238,6 @@ function ProjectsSection() {
         }
     };
 
-    // NEW: delete the currently open asset
     const handleDeleteAsset = async () => {
         if (!activeAsset) return;
 
@@ -245,7 +254,6 @@ function ProjectsSection() {
                 }
             );
 
-            // Remove from local assets list
             setAssetsByProject((prev) => {
                 const projectId = activeAsset.project_id;
                 const existing = prev[projectId] || [];
@@ -257,7 +265,6 @@ function ProjectsSection() {
                 };
             });
 
-            // Close modal and reset state
             setActiveAsset(null);
             setComments([]);
             setAiSuggestions(null);
@@ -267,7 +274,7 @@ function ProjectsSection() {
 
             if (err.response?.status === 403) {
                 alert(
-                    "You are not allowed to delete this asset. Only the owner or the uploader can delete it."
+                    "You are not allowed to delete this asset. Only the project owner can delete assets for now."
                 );
             } else {
                 alert("Failed to delete asset.");
@@ -296,7 +303,6 @@ function ProjectsSection() {
         }
     };
 
-    // button handler that either fetches or toggles visibility
     const handleAiButtonClick = async () => {
         if (!activeAsset || loadingAi) return;
 
@@ -308,15 +314,239 @@ function ProjectsSection() {
         }
     };
 
+    const handleInviteChange = (projectId, value) => {
+        setInviteEmails((prev) => ({
+            ...prev,
+            [projectId]: value,
+        }));
+    };
+
+    const handleInvite = async (projectId) => {
+        const raw = inviteEmails[projectId] || "";
+        const email = raw.trim();
+        if (!email) return;
+
+        try {
+            await api.post(
+                `/projects/${projectId}/invites`,
+                { invited_email: email },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            alert("Invitation sent.");
+            setInviteEmails((prev) => ({
+                ...prev,
+                [projectId]: "",
+            }));
+        } catch (err) {
+            console.error("Failed to send invite", err);
+            const detail = err.response?.data?.detail;
+            alert(detail || "Failed to send invite.");
+        }
+    };
+
     if (loadingProjects) {
         return <p>Loading projects...</p>;
     }
+
+    const renderProjectCard = (project, isOwned) => {
+        const assets = assetsByProject[project.id] || [];
+        const inviteEmail = inviteEmails[project.id] || "";
+
+        return (
+            <div
+                key={project.id}
+                style={{
+                    padding: "0.85rem",
+                    borderRadius: "8px",
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.35rem",
+                }}
+            >
+                <div
+                    style={{
+                        fontWeight: 600,
+                        fontSize: "0.98rem",
+                    }}
+                >
+                    {project.name}
+                </div>
+                {project.description && (
+                    <div
+                        style={{
+                            fontSize: "0.85rem",
+                            color: "#555",
+                        }}
+                    >
+                        {project.description}
+                    </div>
+                )}
+
+                <div
+                    style={{
+                        marginTop: "0.4rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}
+                >
+                    <label
+                        style={{
+                            fontSize: "0.78rem",
+                            padding: "0.25rem 0.6rem",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            cursor: "pointer",
+                            backgroundColor: "#f9fafb",
+                        }}
+                    >
+                        {uploadingFor === project.id
+                            ? "Uploading..."
+                            : "Upload asset"}
+                        <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            onChange={(e) => handleFileChange(project.id, e)}
+                            disabled={uploadingFor === project.id}
+                        />
+                    </label>
+
+                    <button
+                        onClick={() => loadAssets(project.id)}
+                        style={{
+                            padding: "0.25rem 0.6rem",
+                            fontSize: "0.78rem",
+                            borderRadius: "4px",
+                            border: "1px solid #e5e7eb",
+                            backgroundColor: "#f9fafb",
+                            cursor: "pointer",
+                        }}
+                    >
+                        Refresh assets
+                    </button>
+
+                    {isOwned && (
+                        <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            style={{
+                                padding: "0.25rem 0.6rem",
+                                fontSize: "0.78rem",
+                                borderRadius: "4px",
+                                border: "1px solid #fca5a5",
+                                backgroundColor: "#fef2f2",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Delete
+                        </button>
+                    )}
+                </div>
+
+                {isOwned && (
+                    <div
+                        style={{
+                            marginTop: "0.4rem",
+                            display: "flex",
+                            gap: "0.4rem",
+                            alignItems: "center",
+                        }}
+                    >
+                        <input
+                            type="email"
+                            placeholder="Invite collaborator by email"
+                            value={inviteEmail}
+                            onChange={(e) =>
+                                handleInviteChange(project.id, e.target.value)
+                            }
+                            style={{
+                                flexGrow: 1,
+                                padding: "0.35rem 0.6rem",
+                                borderRadius: "4px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "0.8rem",
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => handleInvite(project.id)}
+                            style={{
+                                padding: "0.35rem 0.7rem",
+                                borderRadius: "4px",
+                                border: "none",
+                                fontSize: "0.8rem",
+                                cursor: inviteEmail.trim()
+                                    ? "pointer"
+                                    : "default",
+                                backgroundColor: inviteEmail.trim()
+                                    ? "#111827"
+                                    : "#9ca3af",
+                                color: "#ffffff",
+                            }}
+                            disabled={!inviteEmail.trim()}
+                        >
+                            Invite
+                        </button>
+                    </div>
+                )}
+
+                {/* Assets thumbnails */}
+                {assets.length > 0 && (
+                    <div
+                        style={{
+                            marginTop: "0.4rem",
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fill, minmax(60px, 1fr))",
+                            gap: "0.25rem",
+                        }}
+                    >
+                        {assets.map((asset) => (
+                            <div
+                                key={asset.id}
+                                style={{
+                                    borderRadius: "4px",
+                                    overflow: "hidden",
+                                    border: "1px solid #e5e7eb",
+                                }}
+                            >
+                                <img
+                                    src={`http://localhost:8000/uploads/${asset.file_path}`}
+                                    alt={`Asset ${asset.id}`}
+                                    onClick={() => openAssetViewer(asset)}
+                                    style={{
+                                        width: "100%",
+                                        height: "60px",
+                                        objectFit: "cover",
+                                        display: "block",
+                                        cursor: "pointer",
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const hasOwned = ownedProjects.length > 0;
+    const hasShared = sharedProjects.length > 0;
+
+    const isOwnerOfActiveAssetProject =
+        activeAsset &&
+        ownedProjects.some((p) => p.id === activeAsset.project_id);
 
     return (
         <section style={{ marginTop: "1.5rem" }}>
             <h2 style={{ marginBottom: "0.75rem" }}>Projects</h2>
 
-            {/* Create project form */}
+            {/* Create project form (for everyone, but they become owner) */}
             <form
                 onSubmit={handleCreate}
                 style={{
@@ -373,165 +603,67 @@ function ProjectsSection() {
                 </button>
             </form>
 
-            {/* Projects grid */}
-            {projects.length === 0 ? (
-                <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing
-                    design feedback.
-                </p>
-            ) : (
-                <div
+            {/* Owned projects */}
+            <div style={{ marginBottom: "1.5rem" }}>
+                <h3
                     style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "repeat(auto-fill, minmax(260px, 1fr))",
-                        gap: "0.9rem",
+                        marginBottom: "0.5rem",
+                        fontSize: "0.95rem",
                     }}
                 >
-                    {projects.map((project) => {
-                        const assets = assetsByProject[project.id] || [];
+                    My projects
+                </h3>
+                {!hasOwned ? (
+                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
+                        You have no projects yet. Create one to start managing
+                        design feedback.
+                    </p>
+                ) : (
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fill, minmax(260px, 1fr))",
+                            gap: "0.9rem",
+                        }}
+                    >
+                        {ownedProjects.map((project) =>
+                            renderProjectCard(project, true)
+                        )}
+                    </div>
+                )}
+            </div>
 
-                        return (
-                            <div
-                                key={project.id}
-                                style={{
-                                    padding: "0.85rem",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e0e0e0",
-                                    backgroundColor: "#ffffff",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "0.35rem",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        fontWeight: 600,
-                                        fontSize: "0.98rem",
-                                    }}
-                                >
-                                    {project.name}
-                                </div>
-                                {project.description && (
-                                    <div
-                                        style={{
-                                            fontSize: "0.85rem",
-                                            color: "#555",
-                                        }}
-                                    >
-                                        {project.description}
-                                    </div>
-                                )}
-
-                                <div
-                                    style={{
-                                        marginTop: "0.4rem",
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        gap: "0.5rem",
-                                    }}
-                                >
-                                    <label
-                                        style={{
-                                            fontSize: "0.78rem",
-                                            padding: "0.25rem 0.6rem",
-                                            borderRadius: "4px",
-                                            border: "1px solid #ccc",
-                                            cursor: "pointer",
-                                            backgroundColor: "#f9fafb",
-                                        }}
-                                    >
-                                        {uploadingFor === project.id
-                                            ? "Uploading..."
-                                            : "Upload asset"}
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            style={{ display: "none" }}
-                                            onChange={(e) =>
-                                                handleFileChange(project.id, e)
-                                            }
-                                            disabled={
-                                                uploadingFor === project.id
-                                            }
-                                        />
-                                    </label>
-
-                                    <button
-                                        onClick={() => loadAssets(project.id)}
-                                        style={{
-                                            padding: "0.25rem 0.6rem",
-                                            fontSize: "0.78rem",
-                                            borderRadius: "4px",
-                                            border: "1px solid #e5e7eb",
-                                            backgroundColor: "#f9fafb",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Refresh assets
-                                    </button>
-
-                                    <button
-                                        onClick={() =>
-                                            handleDeleteProject(project.id)
-                                        }
-                                        style={{
-                                            padding: "0.25rem 0.6rem",
-                                            fontSize: "0.78rem",
-                                            borderRadius: "4px",
-                                            border: "1px solid #fca5a5",
-                                            backgroundColor: "#fef2f2",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-
-                                {/* Assets thumbnails */}
-                                {assets.length > 0 && (
-                                    <div
-                                        style={{
-                                            marginTop: "0.4rem",
-                                            display: "grid",
-                                            gridTemplateColumns:
-                                                "repeat(auto-fill, minmax(60px, 1fr))",
-                                            gap: "0.25rem",
-                                        }}
-                                    >
-                                        {assets.map((asset) => (
-                                            <div
-                                                key={asset.id}
-                                                style={{
-                                                    borderRadius: "4px",
-                                                    overflow: "hidden",
-                                                    border: "1px solid #e5e7eb",
-                                                }}
-                                            >
-                                                <img
-                                                    src={`http://localhost:8000/uploads/${asset.file_path}`}
-                                                    alt={`Asset ${asset.id}`}
-                                                    onClick={() =>
-                                                        openAssetViewer(asset)
-                                                    }
-                                                    style={{
-                                                        width: "100%",
-                                                        height: "60px",
-                                                        objectFit: "cover",
-                                                        display: "block",
-                                                        cursor: "pointer",
-                                                    }}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {/* Shared projects */}
+            <div>
+                <h3
+                    style={{
+                        marginBottom: "0.5rem",
+                        fontSize: "0.95rem",
+                    }}
+                >
+                    Projects I'm collaborating on
+                </h3>
+                {!hasShared ? (
+                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
+                        No collaborations yet. Accept an invite to see shared
+                        projects here.
+                    </p>
+                ) : (
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fill, minmax(260px, 1fr))",
+                            gap: "0.9rem",
+                        }}
+                    >
+                        {sharedProjects.map((project) =>
+                            renderProjectCard(project, false)
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
@@ -647,20 +779,22 @@ function ProjectsSection() {
                                                 : "AI Suggestions"}
                                     </button>
 
-                                    <button
-                                        onClick={handleDeleteAsset}
-                                        style={{
-                                            padding: "0.25rem 0.6rem",
-                                            borderRadius: "4px",
-                                            border: "1px solid #ef4444",
-                                            backgroundColor: "#fef2f2",
-                                            color: "#b91c1c",
-                                            fontSize: "0.75rem",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Delete asset
-                                    </button>
+                                    {isOwnerOfActiveAssetProject && (
+                                        <button
+                                            onClick={handleDeleteAsset}
+                                            style={{
+                                                padding: "0.25rem 0.6rem",
+                                                borderRadius: "4px",
+                                                border: "1px solid #ef4444",
+                                                backgroundColor: "#fef2f2",
+                                                color: "#b91c1c",
+                                                fontSize: "0.75rem",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Delete asset
+                                        </button>
+                                    )}
 
                                     <button
                                         onClick={() => setActiveAsset(null)}
@@ -705,18 +839,14 @@ function ProjectsSection() {
                                             margin: 0,
                                         }}
                                     >
-                                        {aiSuggestions.suggestions.map(
-                                            (s, idx) => (
-                                                <li
-                                                    key={idx}
-                                                    style={{
-                                                        marginBottom: "0.15rem",
-                                                    }}
-                                                >
-                                                    {s}
-                                                </li>
-                                            )
-                                        )}
+                                        {aiSuggestions.suggestions.map((s, idx) => (
+                                            <li
+                                                key={idx}
+                                                style={{ marginBottom: "0.15rem" }}
+                                            >
+                                                {s}
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             )}

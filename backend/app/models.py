@@ -94,17 +94,14 @@ class Asset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-
-    # NEW: who uploaded this asset (owner or collaborator)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # NEW
     file_path = Column(String, nullable=False)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="assets")
-    uploader = relationship("User")  # used for delete permissions if collaborator
     comments = relationship("Comment", back_populates="asset")
+    uploader = relationship("User")  # NEW – who uploaded this asset
 
 
 class Comment(Base):

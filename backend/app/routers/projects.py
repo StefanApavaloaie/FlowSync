@@ -12,44 +12,74 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 UPLOAD_DIR = "uploads"
 
 
-def _require_project_owner(
-    db: Session,
-    project_id: int,
-    user_id: int,
-) -> models.Project:
-    """
-    Ensure the project exists and the current user is the owner.
-    """
-    project = (
-        db.query(models.Project)
-        .filter(models.Project.id == project_id)
-        .first()
-    )
+def _get_project_or_404(db: Session, project_id: int) -> models.Project:
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    return project
+
+
+def _ensure_owner(project: models.Project, user_id: int) -> None:
     if project.owner_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the project owner can perform this action",
         )
-    return project
+
+
+def _ensure_can_view_project(db: Session, project: models.Project, user_id: int) -> None:
+    """
+    Owner or participant.
+    """
+    if project.owner_id == user_id:
+        return
+    membership = (
+        db.query(models.ProjectParticipant)
+        .filter(
+            models.ProjectParticipant.project_id == project.id,
+            models.ProjectParticipant.user_id == user_id,
+        )
+        .first()
+    )
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
 
 @router.get("/", response_model=List[schemas.ProjectOut])
-def list_projects(
+def list_owned_projects(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
     """
-    For now, return only projects where the user is the owner.
-    (Later we can add 'projects I collaborate on' separately.)
+    Projects where current user is the owner.
     """
     projects = (
         db.query(models.Project)
         .filter(models.Project.owner_id == current_user.id)
+        .order_by(models.Project.created_at.desc())
+        .all()
+    )
+    return projects
+
+
+@router.get("/shared-with-me", response_model=List[schemas.ProjectOut])
+def list_shared_projects(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Projects where current user is a participant (not owner).
+    """
+    projects = (
+        db.query(models.Project)
+        .join(
+            models.ProjectParticipant,
+            models.ProjectParticipant.project_id == models.Project.id,
+        )
+        .filter(models.ProjectParticipant.user_id == current_user.id)
         .order_by(models.Project.created_at.desc())
         .all()
     )
@@ -66,9 +96,6 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    Create a project; the creator is the owner for that project.
-    """
     project = models.Project(
         name=payload.name,
         description=payload.description,
@@ -86,11 +113,8 @@ def delete_project(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    Only the owner can delete the project.
-    This deletes all assets, their comments, and associated files.
-    """
-    project = _require_project_owner(db, project_id, current_user.id)
+    project = _get_project_or_404(db, project_id)
+    _ensure_owner(project, current_user.id)
 
     # Fetch assets for this project
     assets = (
@@ -123,18 +147,13 @@ def delete_project(
         # Delete asset record
         db.delete(asset)
 
-    # Delete project participants as well (relationship has cascade, but be explicit)
-    db.query(models.ProjectParticipant).filter(
-        models.ProjectParticipant.project_id == project.id
-    ).delete()
-
-    # Finally, delete the project itself
+    # Delete participants and invites via cascades (if configured on relationships)
     db.delete(project)
     db.commit()
     return
 
 
-# ---------- COLLABORATORS MANAGEMENT (OWNER ONLY) ----------
+# ---------- PARTICIPANTS (list / remove) ----------
 
 
 @router.get(
@@ -146,15 +165,14 @@ def list_participants(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    Owner can list all collaborators on the project.
-    (Owner is NOT stored here; this table is collaborators / members.)
-    """
-    project = _require_project_owner(db, project_id, current_user.id)
+    project = _get_project_or_404(db, project_id)
+    _ensure_can_view_project(db, project, current_user.id)
 
     participants = (
         db.query(models.ProjectParticipant)
-        .filter(models.ProjectParticipant.project_id == project.id)
+        .join(models.User, models.ProjectParticipant.user_id == models.User.id)
+        .filter(models.ProjectParticipant.project_id == project_id)
+        .order_by(models.ProjectParticipant.created_at.asc())
         .all()
     )
     return participants
@@ -170,32 +188,90 @@ def remove_participant(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    Owner removes a collaborator from the project.
-    Owner cannot remove themselves here.
-    """
-    project = _require_project_owner(db, project_id, current_user.id)
+    project = _get_project_or_404(db, project_id)
+    _ensure_owner(project, current_user.id)
 
-    if user_id == project.owner_id:
+    if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Owner cannot be removed from their own project.",
+            detail="Owner cannot remove themselves as a participant",
         )
 
-    participation = (
+    membership = (
         db.query(models.ProjectParticipant)
         .filter(
-            models.ProjectParticipant.project_id == project.id,
+            models.ProjectParticipant.project_id == project_id,
             models.ProjectParticipant.user_id == user_id,
         )
         .first()
     )
-    if not participation:
+    if not membership:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Participant not found on this project.",
+            detail="Participant not found",
         )
 
-    db.delete(participation)
+    db.delete(membership)
     db.commit()
     return
+
+
+# ---------- INVITES (create by owner) ----------
+
+
+@router.post(
+    "/{project_id}/invites",
+    response_model=schemas.ProjectInviteOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_invite(
+    project_id: int,
+    payload: schemas.ProjectInviteCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    project = _get_project_or_404(db, project_id)
+    _ensure_owner(project, current_user.id)
+
+    email = payload.invited_email.strip().lower()
+
+    # Cannot invite self
+    if email == current_user.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot invite yourself",
+        )
+
+    # Avoid duplicate pending invites
+    existing_pending = (
+        db.query(models.ProjectInvite)
+        .filter(
+            models.ProjectInvite.project_id == project_id,
+            models.ProjectInvite.invited_email == email,
+            models.ProjectInvite.status == "pending",
+        )
+        .first()
+    )
+    if existing_pending:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="There is already a pending invite for this email",
+        )
+
+    invited_user = (
+        db.query(models.User)
+        .filter(models.User.email == email)
+        .first()
+    )
+
+    invite = models.ProjectInvite(
+        project_id=project_id,
+        invited_email=email,
+        invited_user_id=invited_user.id if invited_user else None,
+        invited_by_id=current_user.id,
+        status="pending",
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+    return invite
