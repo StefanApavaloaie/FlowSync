@@ -1,6 +1,6 @@
 import os
 from typing import List
-
+from datetime import datetime 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -49,19 +49,21 @@ def _ensure_can_view_project(db: Session, project: models.Project, user_id: int)
 
 
 @router.get("/", response_model=List[schemas.ProjectOut])
-def list_owned_projects(
+def list_projects(
+    archived: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    Projects where current user is the owner.
-    """
-    projects = (
-        db.query(models.Project)
-        .filter(models.Project.owner_id == current_user.id)
-        .order_by(models.Project.created_at.desc())
-        .all()
+    q = db.query(models.Project).filter(
+        models.Project.owner_id == current_user.id
     )
+
+    if archived:
+        q = q.filter(models.Project.is_archived.is_(True))
+    else:
+        q = q.filter(models.Project.is_archived.is_(False))
+
+    projects = q.order_by(models.Project.created_at.desc()).all()
     return projects
 
 
@@ -105,6 +107,87 @@ def create_project(
     db.commit()
     db.refresh(project)
     return project
+
+
+@router.patch(
+    "/{project_id}",
+    response_model=schemas.ProjectOut,
+)
+def update_project(
+    project_id: int,
+    payload: schemas.ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    project = (
+        db.query(models.Project)
+        .filter(
+            models.Project.id == project_id,
+            models.Project.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    if payload.name is not None:
+        project.name = payload.name.strip() or project.name
+
+    if payload.description is not None:
+        # allow clearing description via empty string
+        desc = payload.description.strip()
+        project.description = desc or None
+
+    if payload.is_archived is not None:
+        project.is_archived = payload.is_archived
+        project.archived_at = datetime.utcnow() if payload.is_archived else None
+
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.post(
+    "/{project_id}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def leave_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    # Owner cannot "leave" their own project – they should delete or transfer ownership.
+    if project.owner_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project owners cannot leave their own project.",
+        )
+
+    membership = (
+        db.query(models.ProjectParticipant)
+        .filter(
+            models.ProjectParticipant.project_id == project_id,
+            models.ProjectParticipant.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not membership:
+        # nothing to do
+        return
+
+    db.delete(membership)
+    db.commit()
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -275,3 +358,33 @@ def create_invite(
     db.commit()
     db.refresh(invite)
     return invite
+
+def _get_project_for_user_or_404(
+    db: Session,
+    user_id: int,
+    project_id: int,
+) -> models.Project:
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    if project.owner_id == user_id:
+        return project
+
+    membership = (
+        db.query(models.ProjectParticipant)
+        .filter(
+            models.ProjectParticipant.project_id == project_id,
+            models.ProjectParticipant.user_id == user_id,
+        )
+        .first()
+    )
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this project",
+        )
+    return project

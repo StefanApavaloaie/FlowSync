@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -51,24 +51,31 @@ class Project(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    owner = relationship("User", back_populates="projects")
+    # NEW
+    is_archived = Column(Boolean, default=False, nullable=False)
+    archived_at = Column(DateTime, nullable=True)
 
+    owner = relationship("User", back_populates="projects")
     assets = relationship("Asset", back_populates="project")
 
-    # Users invited/added to this project
     participants = relationship(
         "ProjectParticipant",
         back_populates="project",
         cascade="all, delete-orphan",
     )
 
-    # Invites related to this project
     invites = relationship(
         "ProjectInvite",
         back_populates="project",
         cascade="all, delete-orphan",
     )
 
+    # NEW: activity log for this project
+    activities = relationship(
+        "Activity",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
 
 class ProjectParticipant(Base):
     """
@@ -148,3 +155,21 @@ class ProjectInvite(Base):
         foreign_keys=[invited_by_id],
         back_populates="invites_sent",
     )
+class Activity(Base):
+    """
+    Simple activity log entry for a project.
+    e.g. "X uploaded an asset", "Y commented"
+    """
+
+    __tablename__ = "activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    type = Column(String, nullable=False)  # e.g. 'asset_uploaded', 'comment_added'
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", back_populates="activities")
+    user = relationship("User")

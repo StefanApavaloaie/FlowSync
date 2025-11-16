@@ -24,15 +24,23 @@ class ProjectCreate(BaseModel):
     description: str | None = None
 
 
+    
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    is_archived: bool | None = None
+
+
 class ProjectOut(BaseModel):
     id: int
     name: str
     description: str | None
     created_at: datetime
-    owner_id: int  # NEW: so frontend knows who owns it
+    is_archived: bool  # NEW
 
     class Config:
         from_attributes = True
+
 
 
 # ---------- PARTICIPANTS ----------
@@ -113,6 +121,18 @@ class ProjectInviteWithDetailsOut(BaseModel):
     created_at: datetime
     project: ProjectOut
     invited_by: UserOut
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityOut(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    type: str
+    message: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

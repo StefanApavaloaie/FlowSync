@@ -101,8 +101,23 @@ def add_comment(
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    return comment
+    display_name = current_user.display_name or current_user.email
+    asset = (
+        db.query(models.Asset)
+        .filter(models.Asset.id == asset_id)
+        .first()
+    )
+    if asset:
+        activity = models.Activity(
+            project_id=asset.project_id,
+            user_id=current_user.id,
+            type="comment_added",
+            message=f"{display_name} commented on an asset.",
+        )
+        db.add(activity)
+        db.commit()
 
+    return comment
 
 @router.delete(
     "/{asset_id}/comments/{comment_id}",

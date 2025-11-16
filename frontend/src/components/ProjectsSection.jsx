@@ -8,6 +8,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const { token, user } = useAuth();
 
     const [ownedProjects, setOwnedProjects] = useState([]);
+    const [archivedProjects, setArchivedProjects] = useState([]);
     const [sharedProjects, setSharedProjects] = useState([]);
     const [assetsByProject, setAssetsByProject] = useState({});
     const [loadingProjects, setLoadingProjects] = useState(true);
@@ -30,7 +31,57 @@ function ProjectsSection({ refreshKey = 0 }) {
     // per-project invite input
     const [inviteEmails, setInviteEmails] = useState({});
 
-    // Load owned + shared projects
+    // activity log
+    const [activityProject, setActivityProject] = useState(null);
+    const [activityItems, setActivityItems] = useState([]);
+    const [loadingActivity, setLoadingActivity] = useState(false);
+
+    // ---- helpers for project state updates ----
+
+    const applyProjectUpdate = (updated) => {
+        // Owned (active) list
+        setOwnedProjects((prev) => {
+            const exists = prev.some((p) => p.id === updated.id);
+
+            if (!exists) {
+                // if project became active (unarchived) and isn't in list yet, prepend
+                if (!updated.is_archived) {
+                    return [updated, ...prev];
+                }
+                return prev;
+            }
+
+            if (updated.is_archived) {
+                // moved to archived list
+                return prev.filter((p) => p.id !== updated.id);
+            }
+
+            // simple rename/description update
+            return prev.map((p) => (p.id === updated.id ? updated : p));
+        });
+
+        // Archived list
+        setArchivedProjects((prev) => {
+            const exists = prev.some((p) => p.id === updated.id);
+
+            if (updated.is_archived) {
+                if (exists) {
+                    return prev.map((p) => (p.id === updated.id ? updated : p));
+                }
+                return [updated, ...prev];
+            }
+
+            if (exists) {
+                // moved back to active
+                return prev.filter((p) => p.id !== updated.id);
+            }
+
+            return prev;
+        });
+    };
+
+    // ---- load owned + shared + archived projects ----
+
     useEffect(() => {
         if (!token) return;
 
@@ -42,10 +93,15 @@ function ProjectsSection({ refreshKey = 0 }) {
             api.get("/projects/shared-with-me", {
                 headers: { Authorization: `Bearer ${token}` },
             }),
+            api.get("/projects/", {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { archived: true },
+            }),
         ])
-            .then(([ownedRes, sharedRes]) => {
+            .then(([ownedRes, sharedRes, archivedRes]) => {
                 setOwnedProjects(ownedRes.data);
                 setSharedProjects(sharedRes.data);
+                setArchivedProjects(archivedRes.data);
             })
             .catch((err) => {
                 console.error("Failed to load projects", err);
@@ -56,7 +112,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     // Auto-load assets for each project (owned + shared) once
     useEffect(() => {
         if (!token) return;
-        const all = [...ownedProjects, ...sharedProjects];
+        const all = [...ownedProjects, ...sharedProjects, ...archivedProjects];
         if (all.length === 0) return;
 
         all.forEach((project) => {
@@ -65,7 +121,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, ownedProjects, sharedProjects]);
+    }, [token, ownedProjects, sharedProjects, archivedProjects]);
 
     const loadAssets = async (projectId) => {
         try {
@@ -80,6 +136,8 @@ function ProjectsSection({ refreshKey = 0 }) {
             console.error("Failed to load assets", err);
         }
     };
+
+    // ---- CRUD for projects ----
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -118,6 +176,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             });
 
             setOwnedProjects((prev) => prev.filter((p) => p.id !== id));
+            setArchivedProjects((prev) => prev.filter((p) => p.id !== id));
 
             setAssetsByProject((prev) => {
                 const copy = { ...prev };
@@ -125,17 +184,102 @@ function ProjectsSection({ refreshKey = 0 }) {
                 return copy;
             });
 
-            if (activeAsset && assetsByProject[id]) {
-                const stillHas = assetsByProject[id].some(
-                    (a) => a.id === activeAsset.id
-                );
-                if (stillHas) setActiveAsset(null);
+            if (activeAsset && activeAsset.project_id === id) {
+                setActiveAsset(null);
+                setComments([]);
+                setAiSuggestions(null);
+                setShowAi(false);
             }
         } catch (err) {
             console.error("Failed to delete project", err);
             alert("Failed to delete project.");
         }
     };
+
+    const handleRenameProject = async (project) => {
+        const currentName = project.name || "";
+        const newName = window.prompt("New project name", currentName);
+        if (newName === null) return; // cancelled
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === currentName) return;
+
+        try {
+            const res = await api.patch(
+                `/projects/${project.id}`,
+                { name: trimmed },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            applyProjectUpdate(res.data);
+        } catch (err) {
+            console.error("Failed to rename project", err);
+            alert("Failed to rename project.");
+        }
+    };
+
+    const handleArchiveToggle = async (project, targetArchived) => {
+        if (project.is_archived === targetArchived) return;
+
+        if (targetArchived) {
+            const ok = window.confirm(
+                "Archive this project? It will move to the Archived section until you unarchive it."
+            );
+            if (!ok) return;
+        }
+
+        try {
+            const res = await api.patch(
+                `/projects/${project.id}`,
+                { is_archived: targetArchived },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            applyProjectUpdate(res.data);
+        } catch (err) {
+            console.error("Failed to update project archive state", err);
+            alert("Failed to update project.");
+        }
+    };
+
+    const handleLeaveProject = async (projectId) => {
+        const confirmLeave = window.confirm(
+            "Leave this project? You will lose access until invited again."
+        );
+        if (!confirmLeave) return;
+
+        try {
+            await api.post(
+                `/projects/${projectId}/leave`,
+                null,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            setSharedProjects((prev) =>
+                prev.filter((p) => p.id !== projectId)
+            );
+            setAssetsByProject((prev) => {
+                const copy = { ...prev };
+                delete copy[projectId];
+                return copy;
+            });
+
+            if (activeAsset && activeAsset.project_id === projectId) {
+                setActiveAsset(null);
+                setComments([]);
+                setAiSuggestions(null);
+                setShowAi(false);
+            }
+        } catch (err) {
+            console.error("Failed to leave project", err);
+            alert("Failed to leave project.");
+        }
+    };
+
+    // ---- assets / comments / AI ----
 
     const handleFileChange = async (projectId, event) => {
         const file = event.target.files?.[0];
@@ -314,6 +458,8 @@ function ProjectsSection({ refreshKey = 0 }) {
         }
     };
 
+    // ---- invites ----
+
     const handleInviteChange = (projectId, value) => {
         setInviteEmails((prev) => ({
             ...prev,
@@ -346,13 +492,49 @@ function ProjectsSection({ refreshKey = 0 }) {
         }
     };
 
+    // ---- activity log ----
+
+    const openActivityLog = async (project) => {
+        setActivityProject(project);
+        setActivityItems([]);
+        setLoadingActivity(true);
+
+        try {
+            const res = await api.get(
+                `/projects/${project.id}/activity`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            setActivityItems(res.data);
+        } catch (err) {
+            console.error("Failed to load activity", err);
+            alert("Failed to load activity.");
+            setActivityProject(null);
+        } finally {
+            setLoadingActivity(false);
+        }
+    };
+
+    const closeActivityLog = () => {
+        setActivityProject(null);
+        setActivityItems([]);
+        setLoadingActivity(false);
+    };
+
+    // ---- rendering helpers ----
+
     if (loadingProjects) {
         return <p>Loading projects...</p>;
     }
 
-    const renderProjectCard = (project, isOwned) => {
+    const renderProjectCard = (
+        project,
+        { isOwned = false, isShared = false, isArchived = false } = {}
+    ) => {
         const assets = assetsByProject[project.id] || [];
         const inviteEmail = inviteEmails[project.id] || "";
+        const archived = isArchived || project.is_archived;
 
         return (
             <div
@@ -361,20 +543,44 @@ function ProjectsSection({ refreshKey = 0 }) {
                     padding: "0.85rem",
                     borderRadius: "8px",
                     border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: archived ? "#f9fafb" : "#ffffff",
                     display: "flex",
                     flexDirection: "column",
                     gap: "0.35rem",
+                    opacity: archived ? 0.8 : 1,
                 }}
             >
                 <div
                     style={{
-                        fontWeight: 600,
-                        fontSize: "0.98rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.5rem",
                     }}
                 >
-                    {project.name}
+                    <div
+                        style={{
+                            fontWeight: 600,
+                            fontSize: "0.98rem",
+                        }}
+                    >
+                        {project.name}
+                    </div>
+                    {archived && (
+                        <span
+                            style={{
+                                fontSize: "0.7rem",
+                                padding: "0.1rem 0.35rem",
+                                borderRadius: "999px",
+                                backgroundColor: "#e5e7eb",
+                                color: "#4b5563",
+                            }}
+                        >
+                            Archived
+                        </span>
+                    )}
                 </div>
+
                 {project.description && (
                     <div
                         style={{
@@ -390,9 +596,9 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         marginTop: "0.4rem",
                         display: "flex",
-                        justifyContent: "space-between",
                         alignItems: "center",
                         gap: "0.5rem",
+                        flexWrap: "wrap",
                     }}
                 >
                     <label
@@ -401,8 +607,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                             padding: "0.25rem 0.6rem",
                             borderRadius: "4px",
                             border: "1px solid #ccc",
-                            cursor: "pointer",
+                            cursor:
+                                uploadingFor === project.id || archived
+                                    ? "default"
+                                    : "pointer",
                             backgroundColor: "#f9fafb",
+                            opacity:
+                                uploadingFor === project.id || archived
+                                    ? 0.6
+                                    : 1,
                         }}
                     >
                         {uploadingFor === project.id
@@ -413,7 +626,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             accept="image/*"
                             style={{ display: "none" }}
                             onChange={(e) => handleFileChange(project.id, e)}
-                            disabled={uploadingFor === project.id}
+                            disabled={uploadingFor === project.id || archived}
                         />
                     </label>
 
@@ -432,23 +645,72 @@ function ProjectsSection({ refreshKey = 0 }) {
                     </button>
 
                     {isOwned && (
+                        <>
+                            <button
+                                onClick={() => handleRenameProject(project)}
+                                style={{
+                                    padding: "0.25rem 0.6rem",
+                                    fontSize: "0.78rem",
+                                    borderRadius: "4px",
+                                    border: "1px solid #e5e7eb",
+                                    backgroundColor: "#ffffff",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Rename
+                            </button>
+
+                            <button
+                                onClick={() =>
+                                    handleArchiveToggle(project, !archived)
+                                }
+                                style={{
+                                    padding: "0.25rem 0.6rem",
+                                    fontSize: "0.78rem",
+                                    borderRadius: "4px",
+                                    border: "1px solid #e5e7eb",
+                                    backgroundColor: "#ffffff",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                {archived ? "Unarchive" : "Archive"}
+                            </button>
+
+                            <button
+                                onClick={() => handleDeleteProject(project.id)}
+                                style={{
+                                    padding: "0.25rem 0.6rem",
+                                    fontSize: "0.78rem",
+                                    borderRadius: "4px",
+                                    border: "1px solid #fca5a5",
+                                    backgroundColor: "#fef2f2",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Delete
+                            </button>
+                        </>
+                    )}
+
+                    {isShared && (
                         <button
-                            onClick={() => handleDeleteProject(project.id)}
+                            onClick={() => handleLeaveProject(project.id)}
                             style={{
                                 padding: "0.25rem 0.6rem",
                                 fontSize: "0.78rem",
                                 borderRadius: "4px",
-                                border: "1px solid #fca5a5",
-                                backgroundColor: "#fef2f2",
+                                border: "1px solid #e5e7eb",
+                                backgroundColor: "#fff7ed",
+                                color: "#c2410c",
                                 cursor: "pointer",
                             }}
                         >
-                            Delete
+                            Leave project
                         </button>
                     )}
                 </div>
 
-                {isOwned && (
+                {isOwned && !archived && (
                     <div
                         style={{
                             marginTop: "0.4rem",
@@ -495,6 +757,31 @@ function ProjectsSection({ refreshKey = 0 }) {
                     </div>
                 )}
 
+                <div
+                    style={{
+                        marginTop: "0.3rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "0.8rem",
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={() => openActivityLog(project)}
+                        style={{
+                            border: "none",
+                            background: "transparent",
+                            padding: 0,
+                            cursor: "pointer",
+                            color: "#2563eb",
+                            textDecoration: "underline",
+                        }}
+                    >
+                        View activity
+                    </button>
+                </div>
+
                 {/* Assets thumbnails */}
                 {assets.length > 0 && (
                     <div
@@ -537,6 +824,7 @@ function ProjectsSection({ refreshKey = 0 }) {
 
     const hasOwned = ownedProjects.length > 0;
     const hasShared = sharedProjects.length > 0;
+    const hasArchived = archivedProjects.length > 0;
 
     const isOwnerOfActiveAssetProject =
         activeAsset &&
@@ -628,7 +916,41 @@ function ProjectsSection({ refreshKey = 0 }) {
                         }}
                     >
                         {ownedProjects.map((project) =>
-                            renderProjectCard(project, true)
+                            renderProjectCard(project, { isOwned: true })
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Archived projects (owned) */}
+            <div style={{ marginBottom: "1.5rem" }}>
+                <h3
+                    style={{
+                        marginBottom: "0.5rem",
+                        fontSize: "0.95rem",
+                    }}
+                >
+                    Archived projects
+                </h3>
+                {!hasArchived ? (
+                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
+                        No archived projects. Archive a project to hide it from
+                        your main list without deleting it.
+                    </p>
+                ) : (
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fill, minmax(260px, 1fr))",
+                            gap: "0.9rem",
+                        }}
+                    >
+                        {archivedProjects.map((project) =>
+                            renderProjectCard(project, {
+                                isOwned: true,
+                                isArchived: true,
+                            })
                         )}
                     </div>
                 )}
@@ -659,7 +981,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                         }}
                     >
                         {sharedProjects.map((project) =>
-                            renderProjectCard(project, false)
+                            renderProjectCard(project, { isShared: true })
                         )}
                     </div>
                 )}
@@ -839,14 +1161,19 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             margin: 0,
                                         }}
                                     >
-                                        {aiSuggestions.suggestions.map((s, idx) => (
-                                            <li
-                                                key={idx}
-                                                style={{ marginBottom: "0.15rem" }}
-                                            >
-                                                {s}
-                                            </li>
-                                        ))}
+                                        {aiSuggestions.suggestions.map(
+                                            (s, idx) => (
+                                                <li
+                                                    key={idx}
+                                                    style={{
+                                                        marginBottom:
+                                                            "0.15rem",
+                                                    }}
+                                                >
+                                                    {s}
+                                                </li>
+                                            )
+                                        )}
                                     </ul>
                                 </div>
                             )}
@@ -998,6 +1325,133 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     {submittingComment ? "Sending..." : "Send"}
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Activity log modal */}
+            {activityProject && (
+                <div
+                    onClick={closeActivityLog}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        backgroundColor: "rgba(0,0,0,0.35)",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 50,
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: "min(480px, 90vw)",
+                            maxHeight: "70vh",
+                            backgroundColor: "#ffffff",
+                            borderRadius: "10px",
+                            padding: "0.9rem",
+                            boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem",
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                            }}
+                        >
+                            <h3
+                                style={{
+                                    margin: 0,
+                                    fontSize: "1rem",
+                                }}
+                            >
+                                Activity – {activityProject.name}
+                            </h3>
+                            <button
+                                onClick={closeActivityLog}
+                                style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: "0.9rem",
+                                    color: "#6b7280",
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div
+                            style={{
+                                fontSize: "0.8rem",
+                                color: "#6b7280",
+                            }}
+                        >
+                            Recent actions in this project.
+                        </div>
+
+                        <div
+                            style={{
+                                flexGrow: 1,
+                                overflowY: "auto",
+                                marginTop: "0.25rem",
+                                paddingRight: "0.25rem",
+                            }}
+                        >
+                            {loadingActivity ? (
+                                <p
+                                    style={{
+                                        margin: 0,
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    Loading activity...
+                                </p>
+                            ) : activityItems.length === 0 ? (
+                                <p
+                                    style={{
+                                        margin: 0,
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    No activity yet.
+                                </p>
+                            ) : (
+                                activityItems.map((a) => {
+                                    const when = new Date(
+                                        a.created_at
+                                    ).toLocaleString();
+                                    return (
+                                        <div
+                                            key={a.id}
+                                            style={{
+                                                padding: "0.35rem 0",
+                                                borderBottom:
+                                                    "1px solid #e5e7eb",
+                                                fontSize: "0.82rem",
+                                            }}
+                                        >
+                                            <div>{a.message}</div>
+                                            <div
+                                                style={{
+                                                    fontSize: "0.7rem",
+                                                    color: "#9ca3af",
+                                                    marginTop: "0.1rem",
+                                                }}
+                                            >
+                                                {when}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
