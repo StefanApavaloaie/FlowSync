@@ -35,7 +35,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     created_at: datetime
-    is_archived: bool  # NEW
+    is_archived: bool
 
     class Config:
         from_attributes = True
@@ -61,7 +61,7 @@ class ProjectParticipantOut(BaseModel):
 class AssetOut(BaseModel):
     id: int
     project_id: int
-    user_id: int  # who uploaded
+    user_id: int
     file_path: str
     version: int
     created_at: datetime
@@ -75,8 +75,21 @@ class AssetOut(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str
-    # NEW: optional parent comment id for threaded replies
-    parent_comment_id: int | None = None
+
+
+class CommentReactionCreate(BaseModel):
+    emoji: str
+
+
+class CommentReactionOut(BaseModel):
+    id: int
+    comment_id: int
+    user_id: int
+    emoji: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class CommentOut(BaseModel):
@@ -85,8 +98,8 @@ class CommentOut(BaseModel):
     user_id: int
     content: str
     created_at: datetime
-    parent_comment_id: int | None  # NEW
     user: UserOut  # so frontend can show author name/email
+    reactions: list[CommentReactionOut] = []  # NEW
 
     class Config:
         from_attributes = True

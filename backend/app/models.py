@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    DateTime,
+    ForeignKey,
+    Boolean,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -51,7 +60,7 @@ class Project(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # NEW
+    # archive support
     is_archived = Column(Boolean, default=False, nullable=False)
     archived_at = Column(DateTime, nullable=True)
 
@@ -70,7 +79,7 @@ class Project(Base):
         cascade="all, delete-orphan",
     )
 
-    # activity log for this project
+    # activity log
     activities = relationship(
         "Activity",
         back_populates="project",
@@ -90,7 +99,7 @@ class ProjectParticipant(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String, default="member")  # 'member' (collaborator), later maybe 'viewer', etc.
+    role = Column(String, default="member")  # 'member' (collaborator), etc.
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="participants")
@@ -102,7 +111,7 @@ class Asset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # who uploaded
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # uploader
     file_path = Column(String, nullable=False)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -121,17 +130,41 @@ class Comment(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # NEW: threaded comments – optional parent comment
-    parent_comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
-
     asset = relationship("Asset", back_populates="comments")
     user = relationship("User")  # used so we can show author in API
 
-    # Optional relationships for navigating the tree in Python
-    parent = relationship(
-        "Comment",
-        remote_side=[id],
-        backref="replies",
+    # NEW: emoji reactions on this comment
+    reactions = relationship(
+        "CommentReaction",
+        back_populates="comment",
+        cascade="all, delete-orphan",
+    )
+
+
+class CommentReaction(Base):
+    """
+    Emoji reaction to a comment (👍, ❤️, 💡, etc.).
+    One row per (comment, user, emoji).
+    """
+
+    __tablename__ = "comment_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    emoji = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    comment = relationship("Comment", back_populates="reactions")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "comment_id",
+            "user_id",
+            "emoji",
+            name="uq_comment_reaction",
+        ),
     )
 
 
@@ -171,7 +204,7 @@ class ProjectInvite(Base):
 class Activity(Base):
     """
     Simple activity log entry for a project.
-    e.g. "X uploaded an asset", "Y commented"
+    e.g. "X uploaded an asset", "Y commented", "Z reacted 👍 to a comment"
     """
 
     __tablename__ = "activities"
@@ -180,7 +213,7 @@ class Activity(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    type = Column(String, nullable=False)  # e.g. 'asset_uploaded', 'comment_added'
+    type = Column(String, nullable=False)  # 'asset_uploaded', 'comment_added', 'comment_reacted'
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -70,6 +70,7 @@ def list_comments(
         .order_by(models.Comment.created_at.asc())
         .all()
     )
+    # thanks to relationships, .user and .reactions will be available
     return comments
 
 
@@ -84,7 +85,7 @@ def add_comment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
+    _asset, project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     content = (payload.content or "").strip()
     if not content:
@@ -93,29 +94,10 @@ def add_comment(
             detail="Comment content cannot be empty",
         )
 
-    parent_id = payload.parent_comment_id
-
-    # If this is a reply, validate that the parent exists on same asset
-    if parent_id is not None:
-        parent = (
-            db.query(models.Comment)
-            .filter(
-                models.Comment.id == parent_id,
-                models.Comment.asset_id == asset.id,
-            )
-            .first()
-        )
-        if not parent:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Parent comment not found on this asset",
-            )
-
     comment = models.Comment(
         asset_id=asset_id,
         user_id=current_user.id,
         content=content,
-        parent_comment_id=parent_id,
     )
     db.add(comment)
     db.commit()
@@ -124,7 +106,7 @@ def add_comment(
     # Activity log
     display_name = current_user.display_name or current_user.email
     activity = models.Activity(
-        project_id=asset.project_id,
+        project_id=project.id,
         user_id=current_user.id,
         type="comment_added",
         message=f"{display_name} commented on an asset.",
@@ -171,3 +153,88 @@ def delete_comment(
     db.delete(comment)
     db.commit()
     return
+
+
+@router.post(
+    "/{asset_id}/comments/{comment_id}/reactions",
+    response_model=schemas.CommentOut,
+    status_code=status.HTTP_200_OK,
+)
+def toggle_comment_reaction(
+    asset_id: int,
+    comment_id: int,
+    payload: schemas.CommentReactionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Toggle an emoji reaction on a comment.
+    If the user already reacted with this emoji -> remove it.
+    Otherwise -> add it.
+    Returns the updated comment (with reactions).
+    """
+    asset, project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
+
+    comment = (
+        db.query(models.Comment)
+        .filter(
+            models.Comment.id == comment_id,
+            models.Comment.asset_id == asset.id,
+        )
+        .first()
+    )
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found",
+        )
+
+    emoji = (payload.emoji or "").strip()
+    if not emoji:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Emoji is required",
+        )
+
+    existing = (
+        db.query(models.CommentReaction)
+        .filter(
+            models.CommentReaction.comment_id == comment.id,
+            models.CommentReaction.user_id == current_user.id,
+            models.CommentReaction.emoji == emoji,
+        )
+        .first()
+    )
+
+    if existing:
+        # remove reaction
+        db.delete(existing)
+        db.commit()
+    else:
+        # add reaction
+        reaction = models.CommentReaction(
+            comment_id=comment.id,
+            user_id=current_user.id,
+            emoji=emoji,
+        )
+        db.add(reaction)
+        db.commit()
+
+        # activity log only when adding
+        display_name = current_user.display_name or current_user.email
+        activity = models.Activity(
+            project_id=project.id,
+            user_id=current_user.id,
+            type="comment_reacted",
+            message=f"{display_name} reacted {emoji} to a comment.",
+        )
+        db.add(activity)
+        db.commit()
+
+    # reload comment with updated reactions
+    updated_comment = (
+        db.query(models.Comment)
+        .filter(models.Comment.id == comment.id)
+        .first()
+    )
+    return updated_comment

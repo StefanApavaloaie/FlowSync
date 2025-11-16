@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
+// emojis we support
+const REACTION_EMOJIS = ["👍", "❤️", "💡", "😂", "😮"];
+
 function ProjectsSection({ refreshKey = 0 }) {
     const { token, user } = useAuth();
 
@@ -36,9 +39,6 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [activityItems, setActivityItems] = useState([]);
     const [loadingActivity, setLoadingActivity] = useState(false);
 
-    // threaded comments: which comment we’re replying to (null = top-level)
-    const [replyParentId, setReplyParentId] = useState(null);
-
     // ---- helpers for project state updates ----
 
     const applyProjectUpdate = (updated) => {
@@ -47,7 +47,6 @@ function ProjectsSection({ refreshKey = 0 }) {
             const exists = prev.some((p) => p.id === updated.id);
 
             if (!exists) {
-                // if project became active (unarchived) and isn't in list yet, prepend
                 if (!updated.is_archived) {
                     return [updated, ...prev];
                 }
@@ -55,11 +54,9 @@ function ProjectsSection({ refreshKey = 0 }) {
             }
 
             if (updated.is_archived) {
-                // moved to archived list
                 return prev.filter((p) => p.id !== updated.id);
             }
 
-            // simple rename/description update
             return prev.map((p) => (p.id === updated.id ? updated : p));
         });
 
@@ -75,7 +72,6 @@ function ProjectsSection({ refreshKey = 0 }) {
             }
 
             if (exists) {
-                // moved back to active
                 return prev.filter((p) => p.id !== updated.id);
             }
 
@@ -192,7 +188,6 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setComments([]);
                 setAiSuggestions(null);
                 setShowAi(false);
-                setReplyParentId(null);
             }
         } catch (err) {
             console.error("Failed to delete project", err);
@@ -203,7 +198,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const handleRenameProject = async (project) => {
         const currentName = project.name || "";
         const newName = window.prompt("New project name", currentName);
-        if (newName === null) return; // cancelled
+        if (newName === null) return;
         const trimmed = newName.trim();
         if (!trimmed || trimmed === currentName) return;
 
@@ -276,7 +271,6 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setComments([]);
                 setAiSuggestions(null);
                 setShowAi(false);
-                setReplyParentId(null);
             }
         } catch (err) {
             console.error("Failed to leave project", err);
@@ -324,7 +318,6 @@ function ProjectsSection({ refreshKey = 0 }) {
         setComments([]);
         setAiSuggestions(null);
         setShowAi(false);
-        setReplyParentId(null);
 
         if (!asset) return;
 
@@ -352,17 +345,13 @@ function ProjectsSection({ refreshKey = 0 }) {
         try {
             const res = await api.post(
                 `/assets/${activeAsset.id}/comments`,
-                {
-                    content,
-                    parent_comment_id: replyParentId, // NEW: null for top-level, id for reply
-                },
+                { content },
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
             setComments((prev) => [...prev, res.data]);
             setNewComment("");
-            setReplyParentId(null);
         } catch (err) {
             console.error("Failed to add comment", err);
             alert("Failed to add comment.");
@@ -423,7 +412,6 @@ function ProjectsSection({ refreshKey = 0 }) {
             setComments([]);
             setAiSuggestions(null);
             setShowAi(false);
-            setReplyParentId(null);
         } catch (err) {
             console.error("Failed to delete asset", err);
 
@@ -466,6 +454,30 @@ function ProjectsSection({ refreshKey = 0 }) {
             setShowAi(true);
         } else {
             setShowAi((prev) => !prev);
+        }
+    };
+
+    // ---- emoji reactions ----
+
+    const handleToggleReaction = async (commentId, emoji) => {
+        if (!activeAsset) return;
+
+        try {
+            const res = await api.post(
+                `/assets/${activeAsset.id}/comments/${commentId}/reactions`,
+                { emoji },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            const updated = res.data;
+            setComments((prev) =>
+                prev.map((c) => (c.id === updated.id ? updated : c))
+            );
+        } catch (err) {
+            console.error("Failed to toggle reaction", err);
+            alert("Failed to toggle reaction.");
         }
     };
 
@@ -531,143 +543,6 @@ function ProjectsSection({ refreshKey = 0 }) {
         setActivityProject(null);
         setActivityItems([]);
         setLoadingActivity(false);
-    };
-
-    // ---- threaded comments helpers ----
-
-    // Map parent_comment_id -> [replies...]
-    const repliesByParent = comments.reduce((acc, c) => {
-        if (c.parent_comment_id) {
-            if (!acc[c.parent_comment_id]) acc[c.parent_comment_id] = [];
-            acc[c.parent_comment_id].push(c);
-        }
-        return acc;
-    }, {});
-
-    // Only comments with no parent are top-level
-    const topLevelComments = comments.filter(
-        (c) => !c.parent_comment_id
-    );
-
-    const replyingToComment = replyParentId
-        ? comments.find((c) => c.id === replyParentId)
-        : null;
-
-    const renderCommentThread = (comment, depth = 0) => {
-        const author =
-            comment.user?.display_name ||
-            comment.user?.email ||
-            "Unknown user";
-        const email = comment.user?.email;
-
-        <div>
-            <div style={{ whiteSpace: "pre-line" }}>
-                {email ? `${author}\n${email}` : author}
-            </div>
-        </div>
-
-
-
-        // Only allow deleting your own comments (even if owner)
-        const canDelete = user && comment.user_id === user.id;
-
-        const replies = repliesByParent[comment.id] || [];
-
-        return (
-            <div
-                key={comment.id}
-                style={{
-                    marginBottom: "0.35rem",
-                    paddingBottom: depth === 0 ? "0.25rem" : "0.15rem",
-                    borderBottom: depth === 0 ? "1px solid #e5e7eb" : "none",
-                    marginLeft: depth ? "0.75rem" : 0,
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                    }}
-                >
-                    <div>
-                        <div
-                            style={{
-                                fontSize: "0.8rem",
-                                fontWeight: 500,
-                                color: "#374151",
-                            }}
-                        >
-                            {author}
-
-                        </div>
-                    </div>
-
-                    <div
-                        style={{
-                            display: "flex",
-                            gap: "0.5rem",
-                            alignItems: "center",
-                            fontSize: "0.75rem",
-                        }}
-                    >
-                        <button
-                            type="button"
-                            onClick={() => setReplyParentId(comment.id)}
-                            style={{
-                                border: "none",
-                                background: "transparent",
-                                color: "#2563eb",
-                                cursor: "pointer",
-                                padding: 0,
-                            }}
-                        >
-                            Reply
-                        </button>
-
-                        {canDelete && (
-                            <button
-                                onClick={() => handleDeleteComment(comment.id)}
-                                style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    color: "#ef4444",
-                                    fontSize: "0.75rem",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                }}
-                            >
-                                Delete
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div
-                    style={{
-                        marginTop: "0.2rem",
-                        fontSize: "0.85rem",
-                    }}
-                >
-                    {comment.content}
-                </div>
-
-                {replies.length > 0 && (
-                    <div
-                        style={{
-                            marginTop: "0.3rem",
-                            borderLeft: "1px solid #e5e7eb",
-                            paddingLeft: "0.5rem",
-                        }}
-                    >
-                        {replies.map((child) =>
-                            renderCommentThread(child, depth + 1)
-                        )}
-                    </div>
-                )}
-            </div>
-        );
     };
 
     // ---- rendering helpers ----
@@ -1138,10 +1013,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
                 <div
-                    onClick={() => {
-                        setActiveAsset(null);
-                        setReplyParentId(null);
-                    }}
+                    onClick={() => setActiveAsset(null)}
                     style={{
                         position: "fixed",
                         inset: 0,
@@ -1270,10 +1142,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     )}
 
                                     <button
-                                        onClick={() => {
-                                            setActiveAsset(null);
-                                            setReplyParentId(null);
-                                        }}
+                                        onClick={() => setActiveAsset(null)}
                                         style={{
                                             border: "none",
                                             background: "transparent",
@@ -1354,50 +1223,203 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         No comments yet. Start the discussion.
                                     </p>
                                 ) : (
-                                    topLevelComments.map((c) =>
-                                        renderCommentThread(c, 0)
-                                    )
+                                    comments.map((comment) => {
+                                        const authorName =
+                                            comment.user?.display_name ||
+                                            comment.user?.email ||
+                                            "Unknown user";
+                                        const authorEmail =
+                                            comment.user?.email || null;
+
+                                        const canDelete =
+                                            user &&
+                                            comment.user_id === user.id;
+
+                                        const reactions =
+                                            comment.reactions || [];
+
+                                        const grouped = {};
+                                        reactions.forEach((r) => {
+                                            if (!grouped[r.emoji]) {
+                                                grouped[r.emoji] = {
+                                                    count: 0,
+                                                    reactedByMe: false,
+                                                };
+                                            }
+                                            grouped[r.emoji].count += 1;
+                                            if (
+                                                user &&
+                                                r.user_id === user.id
+                                            ) {
+                                                grouped[
+                                                    r.emoji
+                                                ].reactedByMe = true;
+                                            }
+                                        });
+
+                                        return (
+                                            <div
+                                                key={comment.id}
+                                                style={{
+                                                    marginBottom: "0.35rem",
+                                                    paddingBottom: "0.25rem",
+                                                    borderBottom:
+                                                        "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            "space-between",
+                                                        alignItems: "center",
+                                                        gap: "0.5rem",
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <div
+                                                            style={{
+                                                                fontSize:
+                                                                    "0.8rem",
+                                                                fontWeight: 500,
+                                                                color: "#374151",
+                                                            }}
+                                                        >
+                                                            {authorName}
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                fontSize:
+                                                                    "0.75rem",
+                                                                color:
+                                                                    "#9ca3af",
+                                                            }}
+                                                        >
+                                                            {authorEmail ||
+                                                                "Unknown email"}
+                                                        </div>
+                                                    </div>
+
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDeleteComment(
+                                                                    comment.id
+                                                                )
+                                                            }
+                                                            style={{
+                                                                border: "none",
+                                                                background:
+                                                                    "transparent",
+                                                                color:
+                                                                    "#ef4444",
+                                                                fontSize:
+                                                                    "0.75rem",
+                                                                cursor:
+                                                                    "pointer",
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        marginTop: "0.2rem",
+                                                    }}
+                                                >
+                                                    {comment.content}
+                                                </div>
+
+                                                {/* Emoji reactions bar */}
+                                                <div
+                                                    style={{
+                                                        marginTop: "0.25rem",
+                                                        display: "flex",
+                                                        gap: "0.25rem",
+                                                        flexWrap: "wrap",
+                                                    }}
+                                                >
+                                                    {REACTION_EMOJIS.map(
+                                                        (emoji) => {
+                                                            const info =
+                                                                grouped[
+                                                                emoji
+                                                                ] || {
+                                                                    count: 0,
+                                                                    reactedByMe:
+                                                                        false,
+                                                                };
+
+                                                            const isActive =
+                                                                info.reactedByMe;
+                                                            const countLabel =
+                                                                info.count > 0
+                                                                    ? info.count
+                                                                    : "";
+
+                                                            return (
+                                                                <button
+                                                                    key={emoji}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleToggleReaction(
+                                                                            comment.id,
+                                                                            emoji
+                                                                        )
+                                                                    }
+                                                                    style={{
+                                                                        display:
+                                                                            "inline-flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        gap: "0.18rem",
+                                                                        padding:
+                                                                            "0.12rem 0.35rem",
+                                                                        borderRadius:
+                                                                            "999px",
+                                                                        border: `1px solid ${isActive
+                                                                                ? "#4f46e5"
+                                                                                : "#e5e7eb"
+                                                                            }`,
+                                                                        backgroundColor:
+                                                                            isActive
+                                                                                ? "#eef2ff"
+                                                                                : "#f9fafb",
+                                                                        fontSize:
+                                                                            "0.75rem",
+                                                                        cursor:
+                                                                            "pointer",
+                                                                    }}
+                                                                >
+                                                                    <span>
+                                                                        {emoji}
+                                                                    </span>
+                                                                    {countLabel && (
+                                                                        <span
+                                                                            style={{
+                                                                                fontSize:
+                                                                                    "0.7rem",
+                                                                                color:
+                                                                                    "#4b5563",
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                countLabel
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        }
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
                                 )}
                             </div>
-
-                            {/* Replying indicator */}
-                            {replyingToComment && (
-                                <div
-                                    style={{
-                                        marginTop: "0.25rem",
-                                        marginBottom: "0.1rem",
-                                        fontSize: "0.8rem",
-                                        color: "#6b7280",
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <span>
-                                        Replying to{" "}
-                                        <strong>
-                                            {replyingToComment.user
-                                                ?.display_name ||
-                                                replyingToComment.user
-                                                    ?.email ||
-                                                "comment"}
-                                        </strong>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setReplyParentId(null)}
-                                        style={{
-                                            border: "none",
-                                            background: "transparent",
-                                            color: "#ef4444",
-                                            fontSize: "0.75rem",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Cancel reply
-                                    </button>
-                                </div>
-                            )}
 
                             {/* Add comment */}
                             <form
@@ -1410,11 +1432,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }
-                                    placeholder={
-                                        replyingToComment
-                                            ? "Write a reply..."
-                                            : "Add a comment..."
-                                    }
+                                    placeholder="Add a comment..."
                                     style={{
                                         flexGrow: 1,
                                         padding: "0.35rem 0.6rem",
