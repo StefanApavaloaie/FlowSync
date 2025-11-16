@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload  # joinedload added
+from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
@@ -47,7 +47,6 @@ def list_comments(
 
     comments = (
         db.query(models.Comment)
-        .options(joinedload(models.Comment.user))  # load author
         .filter(models.Comment.asset_id == asset_id)
         .order_by(models.Comment.created_at.asc())
         .all()

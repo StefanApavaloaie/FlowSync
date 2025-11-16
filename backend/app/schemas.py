@@ -1,5 +1,9 @@
 from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
+
+
+# ---------- USERS ----------
 
 
 class UserOut(BaseModel):
@@ -10,6 +14,9 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- PROJECTS ----------
 
 
 class ProjectCreate(BaseModel):
@@ -27,6 +34,23 @@ class ProjectOut(BaseModel):
         from_attributes = True
 
 
+# ---------- PARTICIPANTS ----------
+
+
+class ProjectParticipantOut(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    role: str
+    user: UserOut
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- ASSETS ----------
+
+
 class AssetOut(BaseModel):
     id: int
     project_id: int
@@ -36,6 +60,9 @@ class AssetOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- COMMENTS ----------
 
 
 class CommentCreate(BaseModel):
@@ -48,7 +75,25 @@ class CommentOut(BaseModel):
     user_id: int
     content: str
     created_at: datetime
-    user: UserOut | None = None   # NEW
+    user: UserOut  # so frontend can show author name/email
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- INVITES / NOTIFICATIONS ----------
+
+
+class ProjectInviteCreate(BaseModel):
+    invited_email: EmailStr
+
+
+class ProjectInviteOut(BaseModel):
+    id: int
+    project_id: int
+    invited_email: EmailStr
+    status: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
