@@ -54,6 +54,7 @@ class ProjectParticipantOut(BaseModel):
 class AssetOut(BaseModel):
     id: int
     project_id: int
+    user_id: int          # NEW: who uploaded this asset
     file_path: str
     version: int
     created_at: datetime

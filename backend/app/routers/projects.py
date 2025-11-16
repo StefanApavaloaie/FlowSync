@@ -12,11 +12,41 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 UPLOAD_DIR = "uploads"
 
 
+def _require_project_owner(
+    db: Session,
+    project_id: int,
+    user_id: int,
+) -> models.Project:
+    """
+    Ensure the project exists and the current user is the owner.
+    """
+    project = (
+        db.query(models.Project)
+        .filter(models.Project.id == project_id)
+        .first()
+    )
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+    if project.owner_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the project owner can perform this action",
+        )
+    return project
+
+
 @router.get("/", response_model=List[schemas.ProjectOut])
 def list_projects(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
+    """
+    For now, return only projects where the user is the owner.
+    (Later we can add 'projects I collaborate on' separately.)
+    """
     projects = (
         db.query(models.Project)
         .filter(models.Project.owner_id == current_user.id)
@@ -36,6 +66,9 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
+    """
+    Create a project; the creator is the owner for that project.
+    """
     project = models.Project(
         name=payload.name,
         description=payload.description,
@@ -53,21 +86,11 @@ def delete_project(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    # Ensure project belongs to current user
-    project = (
-        db.query(models.Project)
-        .filter(
-            models.Project.id == project_id,
-            models.Project.owner_id == current_user.id,
-        )
-        .first()
-    )
-
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
+    """
+    Only the owner can delete the project.
+    This deletes all assets, their comments, and associated files.
+    """
+    project = _require_project_owner(db, project_id, current_user.id)
 
     # Fetch assets for this project
     assets = (
@@ -100,7 +123,79 @@ def delete_project(
         # Delete asset record
         db.delete(asset)
 
+    # Delete project participants as well (relationship has cascade, but be explicit)
+    db.query(models.ProjectParticipant).filter(
+        models.ProjectParticipant.project_id == project.id
+    ).delete()
+
     # Finally, delete the project itself
     db.delete(project)
+    db.commit()
+    return
+
+
+# ---------- COLLABORATORS MANAGEMENT (OWNER ONLY) ----------
+
+
+@router.get(
+    "/{project_id}/participants",
+    response_model=List[schemas.ProjectParticipantOut],
+)
+def list_participants(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Owner can list all collaborators on the project.
+    (Owner is NOT stored here; this table is collaborators / members.)
+    """
+    project = _require_project_owner(db, project_id, current_user.id)
+
+    participants = (
+        db.query(models.ProjectParticipant)
+        .filter(models.ProjectParticipant.project_id == project.id)
+        .all()
+    )
+    return participants
+
+
+@router.delete(
+    "/{project_id}/participants/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_participant(
+    project_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Owner removes a collaborator from the project.
+    Owner cannot remove themselves here.
+    """
+    project = _require_project_owner(db, project_id, current_user.id)
+
+    if user_id == project.owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owner cannot be removed from their own project.",
+        )
+
+    participation = (
+        db.query(models.ProjectParticipant)
+        .filter(
+            models.ProjectParticipant.project_id == project.id,
+            models.ProjectParticipant.user_id == user_id,
+        )
+        .first()
+    )
+    if not participation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found on this project.",
+        )
+
+    db.delete(participation)
     db.commit()
     return

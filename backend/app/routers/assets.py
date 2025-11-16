@@ -14,25 +14,40 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def _get_owned_project_or_404(
+def _get_project_and_role_or_403(
     db: Session,
     user_id: int,
     project_id: int,
-) -> models.Project:
-    project = (
-        db.query(models.Project)
-        .filter(
-            models.Project.id == project_id,
-            models.Project.owner_id == user_id,
-        )
-        .first()
-    )
+) -> tuple[models.Project, str]:
+    """
+    Return (project, role) where role is 'owner' or 'collaborator'.
+    Raise 404 if project not found, 403 if user is not a member.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
-    return project
+
+    if project.owner_id == user_id:
+        return project, "owner"
+
+    participant = (
+        db.query(models.ProjectParticipant)
+        .filter(
+            models.ProjectParticipant.project_id == project_id,
+            models.ProjectParticipant.user_id == user_id,
+        )
+        .first()
+    )
+    if participant:
+        return project, "collaborator"
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You are not a member of this project.",
+    )
 
 
 @router.post(
@@ -48,9 +63,10 @@ async def upload_asset(
 ):
     """
     Upload an image asset for a given project.
-    Only the project owner is allowed.
+    Allowed for project owner and collaborators.
     """
-    project = _get_owned_project_or_404(db, current_user.id, project_id)
+    project, role = _get_project_and_role_or_403(db, current_user.id, project_id)
+    # role is not used now, but we keep it for clarity
 
     if file.content_type not in (
         "image/png",
@@ -84,7 +100,8 @@ async def upload_asset(
 
     asset = models.Asset(
         project_id=project.id,
-        file_path=filename,  # relative filename
+        user_id=current_user.id,   # NEW: track who uploaded this asset
+        file_path=filename,        # relative filename
         version=current_count + 1,
     )
 
@@ -104,7 +121,11 @@ def list_assets(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    _ = _get_owned_project_or_404(db, current_user.id, project_id)
+    """
+    List assets for a project.
+    Allowed for project owner and collaborators.
+    """
+    _project, _role = _get_project_and_role_or_403(db, current_user.id, project_id)
 
     assets = (
         db.query(models.Asset)
@@ -113,3 +134,64 @@ def list_assets(
         .all()
     )
     return assets
+
+
+@router.delete(
+    "/{project_id}/assets/{asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_asset(
+    project_id: int,
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Delete a single asset.
+    - Owner can delete any asset.
+    - Collaborator can delete only assets they uploaded.
+    """
+    project, role = _get_project_and_role_or_403(db, current_user.id, project_id)
+
+    asset = (
+        db.query(models.Asset)
+        .filter(
+            models.Asset.id == asset_id,
+            models.Asset.project_id == project.id,
+        )
+        .first()
+    )
+    if not asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found",
+        )
+
+    if role != "owner" and asset.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete assets you uploaded.",
+        )
+
+    # Delete comments for this asset
+    comments = (
+        db.query(models.Comment)
+        .filter(models.Comment.asset_id == asset.id)
+        .all()
+    )
+    for comment in comments:
+        db.delete(comment)
+
+    # Delete associated file if it exists
+    if asset.file_path:
+        file_path = os.path.join(UPLOAD_DIR, asset.file_path)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                # Ignore file delete errors in this MVP
+                pass
+
+    db.delete(asset)
+    db.commit()
+    return

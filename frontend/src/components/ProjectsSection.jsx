@@ -1,9 +1,11 @@
+// frontend/src/components/ProjectsSection.jsx
+
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 function ProjectsSection() {
-    const { token } = useAuth();
+    const { token, user } = useAuth(); // current user (id, email, display_name)
 
     const [projects, setProjects] = useState([]);
     const [assetsByProject, setAssetsByProject] = useState({});
@@ -95,7 +97,7 @@ function ProjectsSection() {
         }
     };
 
-    const handleDelete = async (id) => {
+    const handleDeleteProject = async (id) => {
         const confirmDelete = window.confirm("Delete this project?");
         if (!confirmDelete) return;
 
@@ -204,6 +206,75 @@ function ProjectsSection() {
         }
     };
 
+    // delete comment (only your own, UI-wise – backend enforces too)
+    const handleDeleteComment = async (commentId) => {
+        if (!activeAsset) return;
+
+        const confirmDelete = window.confirm("Delete this comment?");
+        if (!confirmDelete) return;
+
+        try {
+            await api.delete(
+                `/assets/${activeAsset.id}/comments/${commentId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            setComments((prev) => prev.filter((c) => c.id !== commentId));
+        } catch (err) {
+            console.error("Failed to delete comment", err);
+            alert("Failed to delete comment.");
+        }
+    };
+
+    // NEW: delete the currently open asset
+    const handleDeleteAsset = async () => {
+        if (!activeAsset) return;
+
+        const confirmDelete = window.confirm(
+            "Delete this asset and all its comments?"
+        );
+        if (!confirmDelete) return;
+
+        try {
+            await api.delete(
+                `/projects/${activeAsset.project_id}/assets/${activeAsset.id}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            // Remove from local assets list
+            setAssetsByProject((prev) => {
+                const projectId = activeAsset.project_id;
+                const existing = prev[projectId] || [];
+                return {
+                    ...prev,
+                    [projectId]: existing.filter(
+                        (a) => a.id !== activeAsset.id
+                    ),
+                };
+            });
+
+            // Close modal and reset state
+            setActiveAsset(null);
+            setComments([]);
+            setAiSuggestions(null);
+            setShowAi(false);
+        } catch (err) {
+            console.error("Failed to delete asset", err);
+
+            if (err.response?.status === 403) {
+                alert(
+                    "You are not allowed to delete this asset. Only the owner or the uploader can delete it."
+                );
+            } else {
+                alert("Failed to delete asset.");
+            }
+        }
+    };
+
     const fetchAiSuggestions = async () => {
         if (!activeAsset) return;
         setLoadingAi(true);
@@ -234,41 +305,6 @@ function ProjectsSection() {
             setShowAi(true);
         } else {
             setShowAi((prev) => !prev);
-        }
-    };
-
-    // delete a single comment (backend allows only author to delete)
-    const handleDeleteComment = async (commentId) => {
-        if (!activeAsset) return;
-
-        const confirmDelete = window.confirm("Delete this comment?");
-        if (!confirmDelete) return;
-
-        try {
-            await api.delete(
-                `/assets/${activeAsset.id}/comments/${commentId}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-            setComments((prev) => prev.filter((c) => c.id !== commentId));
-        } catch (err) {
-            console.error("Failed to delete comment", err);
-            const status = err?.response?.status;
-            if (status === 403) {
-                alert("You can only delete your own comments.");
-            } else {
-                alert("Failed to delete comment.");
-            }
-        }
-    };
-
-    const formatDateTime = (iso) => {
-        if (!iso) return "";
-        try {
-            return new Date(iso).toLocaleString();
-        } catch {
-            return "";
         }
     };
 
@@ -340,14 +376,15 @@ function ProjectsSection() {
             {/* Projects grid */}
             {projects.length === 0 ? (
                 <p style={{ color: "#666" }}>
-                    You have no projects yet. Create one to start managing design
-                    feedback.
+                    You have no projects yet. Create one to start managing
+                    design feedback.
                 </p>
             ) : (
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                        gridTemplateColumns:
+                            "repeat(auto-fill, minmax(260px, 1fr))",
                         gap: "0.9rem",
                     }}
                 >
@@ -415,7 +452,9 @@ function ProjectsSection() {
                                             onChange={(e) =>
                                                 handleFileChange(project.id, e)
                                             }
-                                            disabled={uploadingFor === project.id}
+                                            disabled={
+                                                uploadingFor === project.id
+                                            }
                                         />
                                     </label>
 
@@ -434,7 +473,9 @@ function ProjectsSection() {
                                     </button>
 
                                     <button
-                                        onClick={() => handleDelete(project.id)}
+                                        onClick={() =>
+                                            handleDeleteProject(project.id)
+                                        }
                                         style={{
                                             padding: "0.25rem 0.6rem",
                                             fontSize: "0.78rem",
@@ -471,7 +512,9 @@ function ProjectsSection() {
                                                 <img
                                                     src={`http://localhost:8000/uploads/${asset.file_path}`}
                                                     alt={`Asset ${asset.id}`}
-                                                    onClick={() => openAssetViewer(asset)}
+                                                    onClick={() =>
+                                                        openAssetViewer(asset)
+                                                    }
                                                     style={{
                                                         width: "100%",
                                                         height: "60px",
@@ -502,8 +545,6 @@ function ProjectsSection() {
                         justifyContent: "center",
                         alignItems: "center",
                         zIndex: 40,
-                        padding: "1rem 0",
-                        overflowY: "auto", // key to avoid “stretched” look
                     }}
                 >
                     <div
@@ -515,7 +556,8 @@ function ProjectsSection() {
                             borderRadius: "10px",
                             padding: "1rem",
                             display: "grid",
-                            gridTemplateColumns: "minmax(0, 2.2fr) minmax(260px, 1fr)",
+                            gridTemplateColumns:
+                                "minmax(0, 2.2fr) minmax(260px, 1fr)",
                             gap: "0.75rem",
                             boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
                         }}
@@ -571,7 +613,13 @@ function ProjectsSection() {
                                     Comments
                                 </h3>
 
-                                <div style={{ display: "flex", gap: "0.4rem" }}>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "0.4rem",
+                                        alignItems: "center",
+                                    }}
+                                >
                                     <button
                                         onClick={handleAiButtonClick}
                                         disabled={loadingAi}
@@ -582,7 +630,9 @@ function ProjectsSection() {
                                             fontSize: "0.75rem",
                                             backgroundColor: "#111827",
                                             color: "#ffffff",
-                                            cursor: loadingAi ? "default" : "pointer",
+                                            cursor: loadingAi
+                                                ? "default"
+                                                : "pointer",
                                             opacity: loadingAi ? 0.7 : 1,
                                             width: "10rem",
                                             height: "2rem",
@@ -595,6 +645,21 @@ function ProjectsSection() {
                                                     ? "Hide AI Suggestions"
                                                     : "Show AI Suggestions"
                                                 : "AI Suggestions"}
+                                    </button>
+
+                                    <button
+                                        onClick={handleDeleteAsset}
+                                        style={{
+                                            padding: "0.25rem 0.6rem",
+                                            borderRadius: "4px",
+                                            border: "1px solid #ef4444",
+                                            backgroundColor: "#fef2f2",
+                                            color: "#b91c1c",
+                                            fontSize: "0.75rem",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Delete asset
                                     </button>
 
                                     <button
@@ -640,11 +705,18 @@ function ProjectsSection() {
                                             margin: 0,
                                         }}
                                     >
-                                        {aiSuggestions.suggestions.map((s, idx) => (
-                                            <li key={idx} style={{ marginBottom: "0.15rem" }}>
-                                                {s}
-                                            </li>
-                                        ))}
+                                        {aiSuggestions.suggestions.map(
+                                            (s, idx) => (
+                                                <li
+                                                    key={idx}
+                                                    style={{
+                                                        marginBottom: "0.15rem",
+                                                    }}
+                                                >
+                                                    {s}
+                                                </li>
+                                            )
+                                        )}
                                     </ul>
                                 </div>
                             )}
@@ -677,55 +749,72 @@ function ProjectsSection() {
                                             c.user?.email ||
                                             "Unknown user";
 
+                                        const canDelete =
+                                            user && c.user_id === user.id;
+
                                         return (
                                             <div
                                                 key={c.id}
                                                 style={{
                                                     marginBottom: "0.35rem",
                                                     paddingBottom: "0.25rem",
-                                                    borderBottom: "1px solid #e5e7eb",
-                                                    display: "flex",
-                                                    justifyContent: "space-between",
-                                                    gap: "0.5rem",
+                                                    borderBottom:
+                                                        "1px solid #e5e7eb",
                                                 }}
                                             >
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div
-                                                        style={{
-                                                            fontSize: "0.8rem",
-                                                            fontWeight: 500,
-                                                            color: "#374151",
-                                                        }}
-                                                    >
-                                                        {author}
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            fontSize: "0.72rem",
-                                                            color: "#9ca3af",
-                                                            marginBottom: "0.15rem",
-                                                        }}
-                                                    >
-                                                        {formatDateTime(c.created_at)}
-                                                    </div>
-                                                    <div>{c.content}</div>
-                                                </div>
-
-                                                <button
-                                                    onClick={() =>
-                                                        handleDeleteComment(c.id)
-                                                    }
+                                                <div
                                                     style={{
-                                                        border: "none",
-                                                        background: "transparent",
-                                                        color: "#ef4444",
-                                                        fontSize: "0.75rem",
-                                                        cursor: "pointer",
-                                                        whiteSpace: "nowrap",
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            "space-between",
+                                                        alignItems: "center",
+                                                        gap: "0.5rem",
                                                     }}
                                                 >
-                                                    Delete
-                                                </button>
+                                                    <div>
+                                                        <div
+                                                            style={{
+                                                                fontSize:
+                                                                    "0.8rem",
+                                                                fontWeight: 500,
+                                                                color: "#374151",
+                                                            }}
+                                                        >
+                                                            {author}
+                                                        </div>
+                                                    </div>
+
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDeleteComment(
+                                                                    c.id
+                                                                )
+                                                            }
+                                                            style={{
+                                                                border: "none",
+                                                                background:
+                                                                    "transparent",
+                                                                color:
+                                                                    "#ef4444",
+                                                                fontSize:
+                                                                    "0.75rem",
+                                                                cursor:
+                                                                    "pointer",
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        marginTop: "0.2rem",
+                                                    }}
+                                                >
+                                                    {c.content}
+                                                </div>
                                             </div>
                                         );
                                     })
@@ -740,7 +829,9 @@ function ProjectsSection() {
                                 <input
                                     type="text"
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={(e) =>
+                                        setNewComment(e.target.value)
+                                    }
                                     placeholder="Add a comment..."
                                     style={{
                                         flexGrow: 1,
@@ -752,20 +843,24 @@ function ProjectsSection() {
                                 />
                                 <button
                                     type="submit"
-                                    disabled={submittingComment || !newComment.trim()}
+                                    disabled={
+                                        submittingComment || !newComment.trim()
+                                    }
                                     style={{
                                         padding: "0.35rem 0.7rem",
                                         borderRadius: "4px",
                                         border: "none",
                                         fontSize: "0.8rem",
                                         cursor:
-                                            submittingComment || !newComment.trim()
+                                            submittingComment ||
+                                                !newComment.trim()
                                                 ? "default"
                                                 : "pointer",
                                         backgroundColor: "#111827",
                                         color: "#ffffff",
                                         opacity:
-                                            submittingComment || !newComment.trim()
+                                            submittingComment ||
+                                                !newComment.trim()
                                                 ? 0.6
                                                 : 1,
                                     }}

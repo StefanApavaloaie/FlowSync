@@ -22,15 +22,14 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-    # Projects this user participates in (invited to)
+    # Projects this user participates in (invited to / collaborators)
     project_memberships = relationship(
         "ProjectParticipant",
         back_populates="user",
         cascade="all, delete-orphan",
     )
 
-    # Optional: invites this user has received/sent (not strictly needed in code,
-    # but useful if you ever want to navigate relationships)
+    # Optional: invites this user has received/sent (notifications)
     invites_received = relationship(
         "ProjectInvite",
         foreign_keys="ProjectInvite.invited_user_id",
@@ -83,7 +82,7 @@ class ProjectParticipant(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String, default="member")  # 'member', later maybe 'viewer', etc.
+    role = Column(String, default="member")  # 'member' (collaborator), later maybe 'viewer', etc.
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="participants")
@@ -95,11 +94,16 @@ class Asset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+
+    # NEW: who uploaded this asset (owner or collaborator)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
     file_path = Column(String, nullable=False)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="assets")
+    uploader = relationship("User")  # used for delete permissions if collaborator
     comments = relationship("Comment", back_populates="asset")
 
 
