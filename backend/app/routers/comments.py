@@ -84,7 +84,7 @@ def add_comment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    _asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
+    asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     content = (payload.content or "").strip()
     if not content:
@@ -93,31 +93,47 @@ def add_comment(
             detail="Comment content cannot be empty",
         )
 
+    parent_id = payload.parent_comment_id
+
+    # If this is a reply, validate that the parent exists on same asset
+    if parent_id is not None:
+        parent = (
+            db.query(models.Comment)
+            .filter(
+                models.Comment.id == parent_id,
+                models.Comment.asset_id == asset.id,
+            )
+            .first()
+        )
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Parent comment not found on this asset",
+            )
+
     comment = models.Comment(
         asset_id=asset_id,
         user_id=current_user.id,
         content=content,
+        parent_comment_id=parent_id,
     )
     db.add(comment)
     db.commit()
     db.refresh(comment)
+
+    # Activity log
     display_name = current_user.display_name or current_user.email
-    asset = (
-        db.query(models.Asset)
-        .filter(models.Asset.id == asset_id)
-        .first()
+    activity = models.Activity(
+        project_id=asset.project_id,
+        user_id=current_user.id,
+        type="comment_added",
+        message=f"{display_name} commented on an asset.",
     )
-    if asset:
-        activity = models.Activity(
-            project_id=asset.project_id,
-            user_id=current_user.id,
-            type="comment_added",
-            message=f"{display_name} commented on an asset.",
-        )
-        db.add(activity)
-        db.commit()
+    db.add(activity)
+    db.commit()
 
     return comment
+
 
 @router.delete(
     "/{asset_id}/comments/{comment_id}",

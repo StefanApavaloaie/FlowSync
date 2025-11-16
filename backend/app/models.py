@@ -70,12 +70,13 @@ class Project(Base):
         cascade="all, delete-orphan",
     )
 
-    # NEW: activity log for this project
+    # activity log for this project
     activities = relationship(
         "Activity",
         back_populates="project",
         cascade="all, delete-orphan",
     )
+
 
 class ProjectParticipant(Base):
     """
@@ -101,14 +102,14 @@ class Asset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # NEW
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # who uploaded
     file_path = Column(String, nullable=False)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="assets")
     comments = relationship("Comment", back_populates="asset")
-    uploader = relationship("User")  # NEW – who uploaded this asset
+    uploader = relationship("User")  # who uploaded this asset
 
 
 class Comment(Base):
@@ -120,8 +121,18 @@ class Comment(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # NEW: threaded comments – optional parent comment
+    parent_comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+
     asset = relationship("Asset", back_populates="comments")
     user = relationship("User")  # used so we can show author in API
+
+    # Optional relationships for navigating the tree in Python
+    parent = relationship(
+        "Comment",
+        remote_side=[id],
+        backref="replies",
+    )
 
 
 class ProjectInvite(Base):
@@ -155,6 +166,8 @@ class ProjectInvite(Base):
         foreign_keys=[invited_by_id],
         back_populates="invites_sent",
     )
+
+
 class Activity(Base):
     """
     Simple activity log entry for a project.

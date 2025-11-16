@@ -24,7 +24,6 @@ class ProjectCreate(BaseModel):
     description: str | None = None
 
 
-    
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
@@ -40,7 +39,6 @@ class ProjectOut(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 
 # ---------- PARTICIPANTS ----------
@@ -63,7 +61,7 @@ class ProjectParticipantOut(BaseModel):
 class AssetOut(BaseModel):
     id: int
     project_id: int
-    user_id: int          # NEW
+    user_id: int  # who uploaded
     file_path: str
     version: int
     created_at: datetime
@@ -77,6 +75,8 @@ class AssetOut(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str
+    # NEW: optional parent comment id for threaded replies
+    parent_comment_id: int | None = None
 
 
 class CommentOut(BaseModel):
@@ -85,6 +85,7 @@ class CommentOut(BaseModel):
     user_id: int
     content: str
     created_at: datetime
+    parent_comment_id: int | None  # NEW
     user: UserOut  # so frontend can show author name/email
 
     class Config:

@@ -36,6 +36,9 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [activityItems, setActivityItems] = useState([]);
     const [loadingActivity, setLoadingActivity] = useState(false);
 
+    // threaded comments: which comment we’re replying to (null = top-level)
+    const [replyParentId, setReplyParentId] = useState(null);
+
     // ---- helpers for project state updates ----
 
     const applyProjectUpdate = (updated) => {
@@ -109,7 +112,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             .finally(() => setLoadingProjects(false));
     }, [token, refreshKey]);
 
-    // Auto-load assets for each project (owned + shared) once
+    // Auto-load assets for each project (owned + shared + archived) once
     useEffect(() => {
         if (!token) return;
         const all = [...ownedProjects, ...sharedProjects, ...archivedProjects];
@@ -189,6 +192,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setComments([]);
                 setAiSuggestions(null);
                 setShowAi(false);
+                setReplyParentId(null);
             }
         } catch (err) {
             console.error("Failed to delete project", err);
@@ -272,6 +276,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setComments([]);
                 setAiSuggestions(null);
                 setShowAi(false);
+                setReplyParentId(null);
             }
         } catch (err) {
             console.error("Failed to leave project", err);
@@ -319,6 +324,7 @@ function ProjectsSection({ refreshKey = 0 }) {
         setComments([]);
         setAiSuggestions(null);
         setShowAi(false);
+        setReplyParentId(null);
 
         if (!asset) return;
 
@@ -346,13 +352,17 @@ function ProjectsSection({ refreshKey = 0 }) {
         try {
             const res = await api.post(
                 `/assets/${activeAsset.id}/comments`,
-                { content },
+                {
+                    content,
+                    parent_comment_id: replyParentId, // NEW: null for top-level, id for reply
+                },
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
             setComments((prev) => [...prev, res.data]);
             setNewComment("");
+            setReplyParentId(null);
         } catch (err) {
             console.error("Failed to add comment", err);
             alert("Failed to add comment.");
@@ -413,6 +423,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             setComments([]);
             setAiSuggestions(null);
             setShowAi(false);
+            setReplyParentId(null);
         } catch (err) {
             console.error("Failed to delete asset", err);
 
@@ -520,6 +531,133 @@ function ProjectsSection({ refreshKey = 0 }) {
         setActivityProject(null);
         setActivityItems([]);
         setLoadingActivity(false);
+    };
+
+    // ---- threaded comments helpers ----
+
+    // Map parent_comment_id -> [replies...]
+    const repliesByParent = comments.reduce((acc, c) => {
+        if (c.parent_comment_id) {
+            if (!acc[c.parent_comment_id]) acc[c.parent_comment_id] = [];
+            acc[c.parent_comment_id].push(c);
+        }
+        return acc;
+    }, {});
+
+    // Only comments with no parent are top-level
+    const topLevelComments = comments.filter(
+        (c) => !c.parent_comment_id
+    );
+
+    const replyingToComment = replyParentId
+        ? comments.find((c) => c.id === replyParentId)
+        : null;
+
+    const renderCommentThread = (comment, depth = 0) => {
+        const author =
+            comment.user?.display_name ||
+            comment.user?.email ||
+            "Unknown user";
+
+        // Only allow deleting your own comments (even if owner)
+        const canDelete = user && comment.user_id === user.id;
+
+        const replies = repliesByParent[comment.id] || [];
+
+        return (
+            <div
+                key={comment.id}
+                style={{
+                    marginBottom: "0.35rem",
+                    paddingBottom: depth === 0 ? "0.25rem" : "0.15rem",
+                    borderBottom: depth === 0 ? "1px solid #e5e7eb" : "none",
+                    marginLeft: depth ? "0.75rem" : 0,
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}
+                >
+                    <div>
+                        <div
+                            style={{
+                                fontSize: "0.8rem",
+                                fontWeight: 500,
+                                color: "#374151",
+                            }}
+                        >
+                            {author}
+                        </div>
+                    </div>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            gap: "0.5rem",
+                            alignItems: "center",
+                            fontSize: "0.75rem",
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setReplyParentId(comment.id)}
+                            style={{
+                                border: "none",
+                                background: "transparent",
+                                color: "#2563eb",
+                                cursor: "pointer",
+                                padding: 0,
+                            }}
+                        >
+                            Reply
+                        </button>
+
+                        {canDelete && (
+                            <button
+                                onClick={() => handleDeleteComment(comment.id)}
+                                style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "#ef4444",
+                                    fontSize: "0.75rem",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                }}
+                            >
+                                Delete
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div
+                    style={{
+                        marginTop: "0.2rem",
+                        fontSize: "0.85rem",
+                    }}
+                >
+                    {comment.content}
+                </div>
+
+                {replies.length > 0 && (
+                    <div
+                        style={{
+                            marginTop: "0.3rem",
+                            borderLeft: "1px solid #e5e7eb",
+                            paddingLeft: "0.5rem",
+                        }}
+                    >
+                        {replies.map((child) =>
+                            renderCommentThread(child, depth + 1)
+                        )}
+                    </div>
+                )}
+            </div>
+        );
     };
 
     // ---- rendering helpers ----
@@ -990,7 +1128,10 @@ function ProjectsSection({ refreshKey = 0 }) {
             {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
                 <div
-                    onClick={() => setActiveAsset(null)}
+                    onClick={() => {
+                        setActiveAsset(null);
+                        setReplyParentId(null);
+                    }}
                     style={{
                         position: "fixed",
                         inset: 0,
@@ -1119,7 +1260,10 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     )}
 
                                     <button
-                                        onClick={() => setActiveAsset(null)}
+                                        onClick={() => {
+                                            setActiveAsset(null);
+                                            setReplyParentId(null);
+                                        }}
                                         style={{
                                             border: "none",
                                             background: "transparent",
@@ -1200,83 +1344,50 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         No comments yet. Start the discussion.
                                     </p>
                                 ) : (
-                                    comments.map((c) => {
-                                        const author =
-                                            c.user?.display_name ||
-                                            c.user?.email ||
-                                            "Unknown user";
-
-                                        const canDelete =
-                                            user && c.user_id === user.id;
-
-                                        return (
-                                            <div
-                                                key={c.id}
-                                                style={{
-                                                    marginBottom: "0.35rem",
-                                                    paddingBottom: "0.25rem",
-                                                    borderBottom:
-                                                        "1px solid #e5e7eb",
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        justifyContent:
-                                                            "space-between",
-                                                        alignItems: "center",
-                                                        gap: "0.5rem",
-                                                    }}
-                                                >
-                                                    <div>
-                                                        <div
-                                                            style={{
-                                                                fontSize:
-                                                                    "0.8rem",
-                                                                fontWeight: 500,
-                                                                color: "#374151",
-                                                            }}
-                                                        >
-                                                            {author}
-                                                        </div>
-                                                    </div>
-
-                                                    {canDelete && (
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDeleteComment(
-                                                                    c.id
-                                                                )
-                                                            }
-                                                            style={{
-                                                                border: "none",
-                                                                background:
-                                                                    "transparent",
-                                                                color:
-                                                                    "#ef4444",
-                                                                fontSize:
-                                                                    "0.75rem",
-                                                                cursor:
-                                                                    "pointer",
-                                                            }}
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                <div
-                                                    style={{
-                                                        marginTop: "0.2rem",
-                                                    }}
-                                                >
-                                                    {c.content}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
+                                    topLevelComments.map((c) =>
+                                        renderCommentThread(c, 0)
+                                    )
                                 )}
                             </div>
+
+                            {/* Replying indicator */}
+                            {replyingToComment && (
+                                <div
+                                    style={{
+                                        marginTop: "0.25rem",
+                                        marginBottom: "0.1rem",
+                                        fontSize: "0.8rem",
+                                        color: "#6b7280",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <span>
+                                        Replying to{" "}
+                                        <strong>
+                                            {replyingToComment.user
+                                                ?.display_name ||
+                                                replyingToComment.user
+                                                    ?.email ||
+                                                "comment"}
+                                        </strong>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setReplyParentId(null)}
+                                        style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#ef4444",
+                                            fontSize: "0.75rem",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Cancel reply
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Add comment */}
                             <form
@@ -1289,7 +1400,11 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }
-                                    placeholder="Add a comment..."
+                                    placeholder={
+                                        replyingToComment
+                                            ? "Write a reply..."
+                                            : "Add a comment..."
+                                    }
                                     style={{
                                         flexGrow: 1,
                                         padding: "0.35rem 0.6rem",
