@@ -139,18 +139,29 @@ async def upload_asset(
     )
 
     asset = models.Asset(
-    project_id=project.id,
-    user_id=current_user.id,       # NEW – the uploader
-    file_path=filename,            # relative filename
-    version=current_count + 1,
+        project_id=project.id,
+        user_id=current_user.id,  # make sure this field exists in your model
+        file_path=filename,       # relative filename
+        version=current_count + 1,
     )
-
 
     db.add(asset)
     db.commit()
     db.refresh(asset)
 
+    # NEW: log activity for asset upload
+    display_name = current_user.display_name or current_user.email
+    activity = models.Activity(
+        project_id=project.id,
+        user_id=current_user.id,
+        type="asset_uploaded",
+        message=f"{display_name} uploaded a new asset.",
+    )
+    db.add(activity)
+    db.commit()
+
     return asset
+
 
 
 @router.get(

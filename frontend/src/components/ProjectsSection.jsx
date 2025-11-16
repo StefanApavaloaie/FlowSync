@@ -558,6 +558,15 @@ function ProjectsSection({ refreshKey = 0 }) {
             comment.user?.display_name ||
             comment.user?.email ||
             "Unknown user";
+        const email = comment.user?.email;
+
+        <div>
+            <div style={{ whiteSpace: "pre-line" }}>
+                {email ? `${author}\n${email}` : author}
+            </div>
+        </div>
+
+
 
         // Only allow deleting your own comments (even if owner)
         const canDelete = user && comment.user_id === user.id;
@@ -591,6 +600,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             }}
                         >
                             {author}
+
                         </div>
                     </div>
 
