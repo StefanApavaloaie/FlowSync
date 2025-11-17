@@ -6,3 +6,4 @@ python-dotenv
 passlib[bcrypt]
 python-jose[cryptography]
 pillow
+openai>=1.0.0
