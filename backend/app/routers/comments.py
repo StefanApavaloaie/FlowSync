@@ -70,7 +70,6 @@ def list_comments(
         .order_by(models.Comment.created_at.asc())
         .all()
     )
-    # thanks to relationships, .user and .reactions will be available
     return comments
 
 
@@ -85,7 +84,7 @@ def add_comment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    _asset, project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
+    _asset, _project = _get_asset_with_access_or_404(db, current_user.id, asset_id)
 
     content = (payload.content or "").strip()
     if not content:
@@ -94,19 +93,38 @@ def add_comment(
             detail="Comment content cannot be empty",
         )
 
+    parent_id = payload.parent_id
+
+    # If replying, check parent exists and belongs to the same asset
+    if parent_id is not None:
+        parent = (
+            db.query(models.Comment)
+            .filter(
+                models.Comment.id == parent_id,
+                models.Comment.asset_id == asset_id,
+            )
+            .first()
+        )
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Parent comment not found for this asset",
+            )
+
     comment = models.Comment(
         asset_id=asset_id,
         user_id=current_user.id,
         content=content,
+        parent_id=parent_id,   # NEW
     )
     db.add(comment)
     db.commit()
     db.refresh(comment)
 
-    # Activity log
+    # Activity log (keep your existing code)
     display_name = current_user.display_name or current_user.email
     activity = models.Activity(
-        project_id=project.id,
+        project_id=_asset.project_id,
         user_id=current_user.id,
         type="comment_added",
         message=f"{display_name} commented on an asset.",
@@ -115,6 +133,7 @@ def add_comment(
     db.commit()
 
     return comment
+
 
 
 @router.delete(

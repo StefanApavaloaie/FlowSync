@@ -132,14 +132,14 @@ class Comment(Base):
 
     asset = relationship("Asset", back_populates="comments")
     user = relationship("User")  # used so we can show author in API
-
+    parent_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
     # NEW: emoji reactions on this comment
     reactions = relationship(
         "CommentReaction",
         back_populates="comment",
         cascade="all, delete-orphan",
     )
-
+    parent = relationship("Comment", remote_side=[id], backref="children")
 
 class CommentReaction(Base):
     """

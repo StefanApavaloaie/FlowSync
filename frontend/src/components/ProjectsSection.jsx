@@ -69,6 +69,8 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [loadingComments, setLoadingComments] = useState(false);
     const [submittingComment, setSubmittingComment] = useState(false);
 
+    const [replyTo, setReplyTo] = useState(null); // which comment we reply to
+
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
     const [showAi, setShowAi] = useState(false);
@@ -228,6 +230,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             if (activeAsset && activeAsset.project_id === id) {
                 setActiveAsset(null);
                 setComments([]);
+                setReplyTo(null);
                 setAiSuggestions(null);
                 setShowAi(false);
             }
@@ -311,6 +314,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             if (activeAsset && activeAsset.project_id === projectId) {
                 setActiveAsset(null);
                 setComments([]);
+                setReplyTo(null);
                 setAiSuggestions(null);
                 setShowAi(false);
             }
@@ -358,6 +362,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const openAssetViewer = async (asset) => {
         setActiveAsset(asset);
         setComments([]);
+        setReplyTo(null);
         setAiSuggestions(null);
         setShowAi(false);
 
@@ -383,17 +388,20 @@ function ProjectsSection({ refreshKey = 0 }) {
         const content = newComment.trim();
         if (!content) return;
 
+        const parent_id = replyTo ? replyTo.id : null;
+
         setSubmittingComment(true);
         try {
             const res = await api.post(
                 `/assets/${activeAsset.id}/comments`,
-                { content },
+                { content, parent_id },
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
             setComments((prev) => [...prev, res.data]);
             setNewComment("");
+            setReplyTo(null);
         } catch (err) {
             console.error("Failed to add comment", err);
             alert("Failed to add comment.");
@@ -417,6 +425,9 @@ function ProjectsSection({ refreshKey = 0 }) {
             );
 
             setComments((prev) => prev.filter((c) => c.id !== commentId));
+            if (replyTo && replyTo.id === commentId) {
+                setReplyTo(null);
+            }
         } catch (err) {
             console.error("Failed to delete comment", err);
             alert("Failed to delete comment.");
@@ -452,6 +463,7 @@ function ProjectsSection({ refreshKey = 0 }) {
 
             setActiveAsset(null);
             setComments([]);
+            setReplyTo(null);
             setAiSuggestions(null);
             setShowAi(false);
         } catch (err) {
@@ -585,6 +597,227 @@ function ProjectsSection({ refreshKey = 0 }) {
         setActivityProject(null);
         setActivityItems([]);
         setLoadingActivity(false);
+    };
+
+    // ---- threaded comments helpers ----
+
+    const buildCommentTree = () => {
+        if (!comments || comments.length === 0) return [];
+
+        const byId = new Map();
+        comments.forEach((c) => {
+            byId.set(c.id, { ...c, children: [] });
+        });
+
+        const roots = [];
+
+        const sortByCreated = (a, b) => {
+            const da = new Date(a.created_at);
+            const db = new Date(b.created_at);
+            return da - db;
+        };
+
+        byId.forEach((comment) => {
+            if (comment.parent_id && byId.has(comment.parent_id)) {
+                const parent = byId.get(comment.parent_id);
+                parent.children.push(comment);
+            } else {
+                roots.push(comment);
+            }
+        });
+
+        const sortRecursively = (node) => {
+            if (node.children && node.children.length > 0) {
+                node.children.sort(sortByCreated);
+                node.children.forEach(sortRecursively);
+            }
+        };
+
+        roots.sort(sortByCreated);
+        roots.forEach(sortRecursively);
+
+        return roots;
+    };
+
+    const renderCommentNode = (comment, depth = 0) => {
+        const authorName =
+            comment.user?.display_name ||
+            comment.user?.email ||
+            "Unknown user";
+        const authorEmail = comment.user?.email || null;
+
+        const canDelete = user && comment.user_id === user.id;
+
+        const reactions = comment.reactions || [];
+        const grouped = {};
+        reactions.forEach((r) => {
+            if (!grouped[r.emoji]) {
+                grouped[r.emoji] = {
+                    count: 0,
+                    reactedByMe: false,
+                };
+            }
+            grouped[r.emoji].count += 1;
+            if (user && r.user_id === user.id) {
+                grouped[r.emoji].reactedByMe = true;
+            }
+        });
+
+        const indentPx = depth > 0 ? depth * 16 : 0;
+
+        return (
+            <div
+                key={comment.id}
+                style={{
+                    marginBottom: "0.35rem",
+                    paddingBottom: "0.25rem",
+                    borderBottom:
+                        depth === 0 ? "1px solid #e5e7eb" : "none",
+                    marginLeft: indentPx,
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}
+                >
+                    <div>
+                        <div
+                            style={{
+                                fontSize: "0.8rem",
+                                fontWeight: 500,
+                                color: "#374151",
+                            }}
+                        >
+                            {authorName}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "0.75rem",
+                                color: "#9ca3af",
+                            }}
+                        >
+                            {authorEmail || "Unknown email"}
+                        </div>
+                    </div>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setReplyTo(comment)}
+                            style={{
+                                border: "none",
+                                background: "transparent",
+                                color: "#4b5563",
+                                fontSize: "0.75rem",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Reply
+                        </button>
+
+                        {canDelete && (
+                            <button
+                                onClick={() =>
+                                    handleDeleteComment(comment.id)
+                                }
+                                style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "#ef4444",
+                                    fontSize: "0.75rem",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Delete
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div
+                    style={{
+                        marginTop: "0.2rem",
+                    }}
+                >
+                    {comment.content}
+                </div>
+
+                {/* Emoji reactions bar */}
+                <div
+                    style={{
+                        marginTop: "0.25rem",
+                        display: "flex",
+                        gap: "0.25rem",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    {REACTION_EMOJIS.map((emoji) => {
+                        const info =
+                            grouped[emoji] || {
+                                count: 0,
+                                reactedByMe: false,
+                            };
+
+                        const isActive = info.reactedByMe;
+                        const countLabel =
+                            info.count > 0 ? info.count : "";
+
+                        return (
+                            <button
+                                key={emoji}
+                                type="button"
+                                onClick={() =>
+                                    handleToggleReaction(comment.id, emoji)
+                                }
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.18rem",
+                                    padding: "0.12rem 0.35rem",
+                                    borderRadius: "999px",
+                                    border: `1px solid ${isActive ? "#4f46e5" : "#e5e7eb"
+                                        }`,
+                                    backgroundColor: isActive
+                                        ? "#eef2ff"
+                                        : "#f9fafb",
+                                    fontSize: "0.75rem",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                <span>{emoji}</span>
+                                {countLabel && (
+                                    <span
+                                        style={{
+                                            fontSize: "0.7rem",
+                                            color: "#4b5563",
+                                        }}
+                                    >
+                                        {countLabel}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Children */}
+                {comment.children &&
+                    comment.children.length > 0 &&
+                    comment.children.map((child) =>
+                        renderCommentNode(child, depth + 1)
+                    )}
+            </div>
+        );
     };
 
     // ---- rendering helpers ----
@@ -942,6 +1175,25 @@ function ProjectsSection({ refreshKey = 0 }) {
 
     const activeFileInfo = activeAsset ? getFileInfo(activeAsset) : null;
 
+    const uploadedMeta = (() => {
+        if (!activeAsset) return null;
+        const isMe = user && activeAsset.user_id === user.id;
+        const uploaderText = isMe ? "you" : "a collaborator";
+        let whenText = "";
+        if (activeAsset.created_at) {
+            try {
+                whenText = new Date(
+                    activeAsset.created_at
+                ).toLocaleString();
+            } catch {
+                whenText = "";
+            }
+        }
+        return { uploaderText, whenText };
+    })();
+
+    const commentTree = buildCommentTree();
+
     return (
         <section style={{ marginTop: "1.5rem" }}>
             <h2 style={{ marginBottom: "0.75rem" }}>Projects</h2>
@@ -1102,7 +1354,11 @@ function ProjectsSection({ refreshKey = 0 }) {
             {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
                 <div
-                    onClick={() => setActiveAsset(null)}
+                    onClick={() => {
+                        setActiveAsset(null);
+                        setReplyTo(null);
+                        setNewComment("");
+                    }}
                     style={{
                         position: "fixed",
                         inset: 0,
@@ -1289,7 +1545,11 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     )}
 
                                     <button
-                                        onClick={() => setActiveAsset(null)}
+                                        onClick={() => {
+                                            setActiveAsset(null);
+                                            setReplyTo(null);
+                                            setNewComment("");
+                                        }}
                                         style={{
                                             border: "none",
                                             background: "transparent",
@@ -1302,6 +1562,19 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     </button>
                                 </div>
                             </div>
+
+                            {uploadedMeta && (
+                                <div
+                                    style={{
+                                        fontSize: "0.75rem",
+                                        color: "#6b7280",
+                                    }}
+                                >
+                                    Uploaded by {uploadedMeta.uploaderText}
+                                    {uploadedMeta.whenText &&
+                                        ` · ${uploadedMeta.whenText}`}
+                                </div>
+                            )}
 
                             {/* AI suggestions panel */}
                             {aiSuggestions && showAi && (
@@ -1365,208 +1638,54 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     <p style={{ margin: 0, color: "#6b7280" }}>
                                         Loading comments...
                                     </p>
-                                ) : comments.length === 0 ? (
+                                ) : commentTree.length === 0 ? (
                                     <p style={{ margin: 0, color: "#6b7280" }}>
                                         No comments yet. Start the discussion.
                                     </p>
                                 ) : (
-                                    comments.map((comment) => {
-                                        const authorName =
-                                            comment.user?.display_name ||
-                                            comment.user?.email ||
-                                            "Unknown user";
-                                        const authorEmail =
-                                            comment.user?.email || null;
-
-                                        const canDelete =
-                                            user &&
-                                            comment.user_id === user.id;
-
-                                        const reactions =
-                                            comment.reactions || [];
-
-                                        const grouped = {};
-                                        reactions.forEach((r) => {
-                                            if (!grouped[r.emoji]) {
-                                                grouped[r.emoji] = {
-                                                    count: 0,
-                                                    reactedByMe: false,
-                                                };
-                                            }
-                                            grouped[r.emoji].count += 1;
-                                            if (
-                                                user &&
-                                                r.user_id === user.id
-                                            ) {
-                                                grouped[
-                                                    r.emoji
-                                                ].reactedByMe = true;
-                                            }
-                                        });
-
-                                        return (
-                                            <div
-                                                key={comment.id}
-                                                style={{
-                                                    marginBottom: "0.35rem",
-                                                    paddingBottom: "0.25rem",
-                                                    borderBottom:
-                                                        "1px solid #e5e7eb",
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        justifyContent:
-                                                            "space-between",
-                                                        alignItems: "center",
-                                                        gap: "0.5rem",
-                                                    }}
-                                                >
-                                                    <div>
-                                                        <div
-                                                            style={{
-                                                                fontSize:
-                                                                    "0.8rem",
-                                                                fontWeight: 500,
-                                                                color: "#374151",
-                                                            }}
-                                                        >
-                                                            {authorName}
-                                                        </div>
-                                                        <div
-                                                            style={{
-                                                                fontSize:
-                                                                    "0.75rem",
-                                                                color:
-                                                                    "#9ca3af",
-                                                            }}
-                                                        >
-                                                            {authorEmail ||
-                                                                "Unknown email"}
-                                                        </div>
-                                                    </div>
-
-                                                    {canDelete && (
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDeleteComment(
-                                                                    comment.id
-                                                                )
-                                                            }
-                                                            style={{
-                                                                border: "none",
-                                                                background:
-                                                                    "transparent",
-                                                                color:
-                                                                    "#ef4444",
-                                                                fontSize:
-                                                                    "0.75rem",
-                                                                cursor:
-                                                                    "pointer",
-                                                            }}
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                <div
-                                                    style={{
-                                                        marginTop: "0.2rem",
-                                                    }}
-                                                >
-                                                    {comment.content}
-                                                </div>
-
-                                                {/* Emoji reactions bar */}
-                                                <div
-                                                    style={{
-                                                        marginTop: "0.25rem",
-                                                        display: "flex",
-                                                        gap: "0.25rem",
-                                                        flexWrap: "wrap",
-                                                    }}
-                                                >
-                                                    {REACTION_EMOJIS.map(
-                                                        (emoji) => {
-                                                            const info =
-                                                                grouped[
-                                                                emoji
-                                                                ] || {
-                                                                    count: 0,
-                                                                    reactedByMe:
-                                                                        false,
-                                                                };
-
-                                                            const isActive =
-                                                                info.reactedByMe;
-                                                            const countLabel =
-                                                                info.count > 0
-                                                                    ? info.count
-                                                                    : "";
-
-                                                            return (
-                                                                <button
-                                                                    key={emoji}
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleToggleReaction(
-                                                                            comment.id,
-                                                                            emoji
-                                                                        )
-                                                                    }
-                                                                    style={{
-                                                                        display:
-                                                                            "inline-flex",
-                                                                        alignItems:
-                                                                            "center",
-                                                                        gap: "0.18rem",
-                                                                        padding:
-                                                                            "0.12rem 0.35rem",
-                                                                        borderRadius:
-                                                                            "999px",
-                                                                        border: `1px solid ${isActive
-                                                                                ? "#4f46e5"
-                                                                                : "#e5e7eb"
-                                                                            }`,
-                                                                        backgroundColor:
-                                                                            isActive
-                                                                                ? "#eef2ff"
-                                                                                : "#f9fafb",
-                                                                        fontSize:
-                                                                            "0.75rem",
-                                                                        cursor:
-                                                                            "pointer",
-                                                                    }}
-                                                                >
-                                                                    <span>
-                                                                        {emoji}
-                                                                    </span>
-                                                                    {countLabel && (
-                                                                        <span
-                                                                            style={{
-                                                                                fontSize:
-                                                                                    "0.7rem",
-                                                                                color:
-                                                                                    "#4b5563",
-                                                                            }}
-                                                                        >
-                                                                            {
-                                                                                countLabel
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </button>
-                                                            );
-                                                        }
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
+                                    commentTree.map((comment) =>
+                                        renderCommentNode(comment, 0)
+                                    )
                                 )}
                             </div>
+
+                            {/* Reply context */}
+                            {replyTo && (
+                                <div
+                                    style={{
+                                        marginTop: "0.3rem",
+                                        marginBottom: "0.1rem",
+                                        fontSize: "0.8rem",
+                                        color: "#4b5563",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: "0.5rem",
+                                    }}
+                                >
+                                    <span>
+                                        Replying to{" "}
+                                        <strong>
+                                            {replyTo.user?.display_name ||
+                                                replyTo.user?.email ||
+                                                "comment"}
+                                        </strong>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setReplyTo(null)}
+                                        style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            fontSize: "0.75rem",
+                                            color: "#6b7280",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Add comment */}
                             <form
@@ -1579,7 +1698,11 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }
-                                    placeholder="Add a comment..."
+                                    placeholder={
+                                        replyTo
+                                            ? "Write a reply..."
+                                            : "Add a comment..."
+                                    }
                                     style={{
                                         flexGrow: 1,
                                         padding: "0.35rem 0.6rem",

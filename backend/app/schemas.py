@@ -75,7 +75,7 @@ class AssetOut(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str
-
+    parent_id: int | None = None
 
 class CommentReactionCreate(BaseModel):
     emoji: str
@@ -97,6 +97,7 @@ class CommentOut(BaseModel):
     asset_id: int
     user_id: int
     content: str
+    parent_id: int | None = None
     created_at: datetime
     user: UserOut  # so frontend can show author name/email
     reactions: list[CommentReactionOut] = []  # NEW
