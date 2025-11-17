@@ -8,6 +8,19 @@ import { useAuth } from "../context/AuthContext";
 const REACTION_EMOJIS = ["👍", "❤️", "💡", "😂", "😮"];
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
 
+// asset status options
+const ASSET_STATUS_OPTIONS = [
+    { value: "needs_feedback", label: "Needs feedback" },
+    { value: "in_progress", label: "In progress" },
+    { value: "changes_requested", label: "Changes requested" },
+    { value: "final", label: "Final" },
+];
+
+function getAssetStatusLabel(status) {
+    const found = ASSET_STATUS_OPTIONS.find((s) => s.value === status);
+    return found ? found.label : "Needs feedback";
+}
+
 function getFileInfo(asset) {
     const filePath = asset?.file_path || "";
     const lastSlash = filePath.lastIndexOf("/");
@@ -61,6 +74,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [newDeadline, setNewDeadline] = useState(""); // NEW: deadline for new project
     const [uploadingFor, setUploadingFor] = useState(null);
 
     const [activeAsset, setActiveAsset] = useState(null);
@@ -193,6 +207,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                 {
                     name: name.trim(),
                     description: description.trim() || null,
+                    deadline: newDeadline || null, // NEW
                 },
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -201,6 +216,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             setOwnedProjects((prev) => [res.data, ...prev]);
             setName("");
             setDescription("");
+            setNewDeadline("");
         } catch (err) {
             console.error("Failed to create project", err);
             alert("Failed to create project.");
@@ -284,6 +300,27 @@ function ProjectsSection({ refreshKey = 0 }) {
         } catch (err) {
             console.error("Failed to update project archive state", err);
             alert("Failed to update project.");
+        }
+    };
+
+    const handleUpdateProjectDeadline = async (project, dateValue) => {
+        // dateValue is either "" or "YYYY-MM-DD"
+        const deadline = dateValue && dateValue.trim
+            ? dateValue.trim()
+            : dateValue || null;
+
+        try {
+            const res = await api.patch(
+                `/projects/${project.id}`,
+                { deadline: deadline || null },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            applyProjectUpdate(res.data);
+        } catch (err) {
+            console.error("Failed to update project deadline", err);
+            alert("Failed to update deadline.");
         }
     };
 
@@ -476,6 +513,42 @@ function ProjectsSection({ refreshKey = 0 }) {
             } else {
                 alert("Failed to delete asset.");
             }
+        }
+    };
+
+    const handleChangeAssetStatus = async (asset, newStatus) => {
+        if (!asset) return;
+
+        try {
+            const res = await api.patch(
+                `/assets/${asset.id}/status`,
+                { status: newStatus },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            const updated = res.data;
+
+            // Update active asset
+            setActiveAsset((prev) =>
+                prev && prev.id === updated.id ? updated : prev
+            );
+
+            // Update in project asset list
+            setAssetsByProject((prev) => {
+                const projectId = updated.project_id;
+                const existing = prev[projectId] || [];
+                return {
+                    ...prev,
+                    [projectId]: existing.map((a) =>
+                        a.id === updated.id ? updated : a
+                    ),
+                };
+            });
+        } catch (err) {
+            console.error("Failed to update asset status", err);
+            alert("Failed to update asset status.");
         }
     };
 
@@ -785,7 +858,9 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     gap: "0.18rem",
                                     padding: "0.12rem 0.35rem",
                                     borderRadius: "999px",
-                                    border: `1px solid ${isActive ? "#4f46e5" : "#e5e7eb"
+                                    border: `1px solid ${isActive
+                                            ? "#4f46e5"
+                                            : "#e5e7eb"
                                         }`,
                                     backgroundColor: isActive
                                         ? "#eef2ff"
@@ -889,6 +964,55 @@ function ProjectsSection({ refreshKey = 0 }) {
                         {project.description}
                     </div>
                 )}
+
+                {/* Deadline row */}
+                <div
+                    style={{
+                        marginTop: "0.25rem",
+                        fontSize: "0.8rem",
+                        color: "#4b5563",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <span style={{ fontWeight: 500 }}>Deadline:</span>
+                    {isOwned && !archived ? (
+                        <>
+                            <input
+                                type="date"
+                                value={project.deadline || ""}
+                                onChange={(e) =>
+                                    handleUpdateProjectDeadline(
+                                        project,
+                                        e.target.value
+                                    )
+                                }
+                                style={{
+                                    fontSize: "0.78rem",
+                                    padding: "0.2rem 0.4rem",
+                                    borderRadius: "4px",
+                                    border: "1px solid #d1d5db",
+                                }}
+                            />
+                            {!project.deadline && (
+                                <span
+                                    style={{
+                                        fontSize: "0.75rem",
+                                        color: "#9ca3af",
+                                    }}
+                                >
+                                    Not set
+                                </span>
+                            )}
+                        </>
+                    ) : (
+                        <span>
+                            {project.deadline || "Not set"}
+                        </span>
+                    )}
+                </div>
 
                 <div
                     style={{
@@ -1102,6 +1226,9 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         borderRadius: "4px",
                                         overflow: "hidden",
                                         border: "1px solid #e5e7eb",
+                                        backgroundColor: "#ffffff",
+                                        display: "flex",
+                                        flexDirection: "column",
                                     }}
                                 >
                                     {isImage ? (
@@ -1156,6 +1283,22 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             </span>
                                         </button>
                                     )}
+
+                                    <div
+                                        style={{
+                                            padding: "0.1rem 0.25rem",
+                                            borderTop: "1px solid #e5e7eb",
+                                            fontSize: "0.65rem",
+                                            textAlign: "center",
+                                            backgroundColor: "#f9fafb",
+                                            color: "#4b5563",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
+                                        {getAssetStatusLabel(asset.status)}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -1236,6 +1379,42 @@ function ProjectsSection({ refreshKey = 0 }) {
                         resize: "vertical",
                     }}
                 />
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <label
+                        style={{
+                            fontSize: "0.8rem",
+                            color: "#4b5563",
+                        }}
+                    >
+                        Deadline:
+                    </label>
+                    <input
+                        type="date"
+                        value={newDeadline}
+                        onChange={(e) => setNewDeadline(e.target.value)}
+                        style={{
+                            padding: "0.4rem 0.75rem",
+                            borderRadius: "6px",
+                            border: "1px solid #ccc",
+                            fontSize: "0.85rem",
+                        }}
+                    />
+                    <span
+                        style={{
+                            fontSize: "0.75rem",
+                            color: "#9ca3af",
+                        }}
+                    >
+                        (optional)
+                    </span>
+                </div>
                 <button
                     type="submit"
                     disabled={creating}
@@ -1354,11 +1533,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             {/* Asset viewer + comments + AI suggestions */}
             {activeAsset && (
                 <div
-                    onClick={() => {
-                        setActiveAsset(null);
-                        setReplyTo(null);
-                        setNewComment("");
-                    }}
+                    onClick={() => setActiveAsset(null)}
                     style={{
                         position: "fixed",
                         inset: 0,
@@ -1545,11 +1720,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     )}
 
                                     <button
-                                        onClick={() => {
-                                            setActiveAsset(null);
-                                            setReplyTo(null);
-                                            setNewComment("");
-                                        }}
+                                        onClick={() => setActiveAsset(null)}
                                         style={{
                                             border: "none",
                                             background: "transparent",
@@ -1573,6 +1744,62 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     Uploaded by {uploadedMeta.uploaderText}
                                     {uploadedMeta.whenText &&
                                         ` · ${uploadedMeta.whenText}`}
+                                </div>
+                            )}
+
+                            {/* Asset status row */}
+                            {activeAsset && (
+                                <div
+                                    style={{
+                                        fontSize: "0.8rem",
+                                        color: "#374151",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.4rem",
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 500 }}>
+                                        Status:
+                                    </span>
+                                    {isOwnerOfActiveAssetProject ? (
+                                        <select
+                                            value={
+                                                activeAsset.status ||
+                                                "needs_feedback"
+                                            }
+                                            onChange={(e) =>
+                                                handleChangeAssetStatus(
+                                                    activeAsset,
+                                                    e.target.value
+                                                )
+                                            }
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                padding: "0.2rem 0.4rem",
+                                                borderRadius: "4px",
+                                                border: "1px solid #d1d5db",
+                                                backgroundColor: "#ffffff",
+                                            }}
+                                        >
+                                            {ASSET_STATUS_OPTIONS.map(
+                                                (opt) => (
+                                                    <option
+                                                        key={opt.value}
+                                                        value={opt.value}
+                                                    >
+                                                        {opt.label}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    ) : (
+                                        <span>
+                                            {getAssetStatusLabel(
+                                                activeAsset.status
+                                            )}
+                                        </span>
+                                    )}
                                 </div>
                             )}
 
@@ -1698,11 +1925,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
                                     }
-                                    placeholder={
-                                        replyTo
-                                            ? "Write a reply..."
-                                            : "Add a comment..."
-                                    }
+                                    placeholder="Add a comment..."
                                     style={{
                                         flexGrow: 1,
                                         padding: "0.35rem 0.6rem",

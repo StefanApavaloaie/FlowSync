@@ -257,3 +257,72 @@ def toggle_comment_reaction(
         .first()
     )
     return updated_comment
+
+@router.patch("/{asset_id}/status", response_model=schemas.AssetOut)
+def update_asset_status(
+    asset_id: int,
+    payload: schemas.AssetStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_from_header),
+):
+    """
+    Update the workflow status for an asset.
+    Only the project owner is allowed to change this.
+    """
+
+    # Only let owners touch status
+    asset = (
+        db.query(models.Asset)
+        .join(models.Project, models.Asset.project_id == models.Project.id)
+        .filter(
+            models.Asset.id == asset_id,
+            models.Project.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found or you are not allowed to modify it.",
+        )
+
+    new_status = (payload.status or "").strip()
+    allowed = {
+        "needs_feedback",
+        "in_progress",
+        "changes_requested",
+        "final",
+    }
+
+    if new_status not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status value.",
+        )
+
+    if asset.status != new_status:
+        asset.status = new_status
+
+        # Optional: activity log entry
+        project = asset.project
+        display_name = current_user.display_name or current_user.email
+        label_map = {
+            "needs_feedback": "Needs feedback",
+            "in_progress": "In progress",
+            "changes_requested": "Changes requested",
+            "final": "Final",
+        }
+        pretty = label_map.get(new_status, new_status)
+
+        activity = models.Activity(
+            project_id=project.id,
+            user_id=current_user.id,
+            type="asset_status_changed",
+            message=f"{display_name} set an asset status to '{pretty}'.",
+        )
+        db.add(activity)
+
+    db.commit()
+    db.refresh(asset)
+    return asset

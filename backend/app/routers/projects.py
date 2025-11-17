@@ -102,6 +102,7 @@ def create_project(
         name=payload.name,
         description=payload.description,
         owner_id=current_user.id,
+        deadline=payload.deadline,
     )
     db.add(project)
     db.commit()
@@ -145,6 +146,9 @@ def update_project(
     if payload.is_archived is not None:
         project.is_archived = payload.is_archived
         project.archived_at = datetime.utcnow() if payload.is_archived else None
+
+    if payload.deadline is not None:
+        project.deadline = payload.deadline
 
     db.commit()
     db.refresh(project)

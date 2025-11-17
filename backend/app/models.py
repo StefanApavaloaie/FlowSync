@@ -85,7 +85,7 @@ class Project(Base):
         back_populates="project",
         cascade="all, delete-orphan",
     )
-
+    deadline = Column(String , nullable = True)
 
 class ProjectParticipant(Base):
     """
@@ -115,6 +115,8 @@ class Asset(Base):
     file_path = Column(String, nullable=False)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    status = Column(String, default="needs_feedback", nullable=False)
 
     project = relationship("Project", back_populates="assets")
     comments = relationship("Comment", back_populates="asset")

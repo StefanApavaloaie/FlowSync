@@ -22,13 +22,13 @@ class UserOut(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     description: str | None = None
-
+    deadline: str |None = None
 
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     is_archived: bool | None = None
-
+    deadline: str |None = None
 
 class ProjectOut(BaseModel):
     id: int
@@ -36,9 +36,9 @@ class ProjectOut(BaseModel):
     description: str | None
     created_at: datetime
     is_archived: bool
-
+    deadline: str | None
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # ---------- PARTICIPANTS ----------
@@ -65,11 +65,13 @@ class AssetOut(BaseModel):
     file_path: str
     version: int
     created_at: datetime
+    status: str 
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
-
+class AssetStatusUpdate(BaseModel):
+    status: str
 # ---------- COMMENTS ----------
 
 
@@ -151,3 +153,5 @@ class ActivityOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
