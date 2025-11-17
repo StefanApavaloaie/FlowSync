@@ -6,6 +6,48 @@ import { useAuth } from "../context/AuthContext";
 
 // emojis we support
 const REACTION_EMOJIS = ["👍", "❤️", "💡", "😂", "😮"];
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
+
+function getFileInfo(asset) {
+    const filePath = asset?.file_path || "";
+    const lastSlash = filePath.lastIndexOf("/");
+    const base = lastSlash >= 0 ? filePath.slice(lastSlash + 1) : filePath;
+    const dot = base.lastIndexOf(".");
+    const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : "";
+    const name = asset.original_filename || base || "File";
+
+    let kind = "file";
+    let icon = "📁";
+    let label = ext ? `${ext.toUpperCase()} file` : "File";
+
+    if (IMAGE_EXTENSIONS.includes(ext)) {
+        kind = "image";
+        icon = "🖼";
+        label = `${ext.toUpperCase()} image`;
+    } else if (ext === "pdf") {
+        kind = "pdf";
+        icon = "📄";
+        label = "PDF document";
+    } else if (ext === "doc" || ext === "docx") {
+        kind = "word";
+        icon = "📄";
+        label = "Word document";
+    } else if (["xls", "xlsx", "csv"].includes(ext)) {
+        kind = "sheet";
+        icon = "📊";
+        label = "Spreadsheet";
+    } else if (ext === "ppt" || ext === "pptx") {
+        kind = "deck";
+        icon = "📈";
+        label = "Presentation";
+    } else if (ext === "txt" || ext === "md") {
+        kind = "text";
+        icon = "📜";
+        label = "Text file";
+    }
+
+    return { ext, name, kind, icon, label };
+}
 
 function ProjectsSection({ refreshKey = 0 }) {
     const { token, user } = useAuth();
@@ -646,7 +688,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             : "Upload asset"}
                         <input
                             type="file"
-                            accept="image/*"
+                            accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                             style={{ display: "none" }}
                             onChange={(e) => handleFileChange(project.id, e)}
                             disabled={uploadingFor === project.id || archived}
@@ -816,29 +858,74 @@ function ProjectsSection({ refreshKey = 0 }) {
                             gap: "0.25rem",
                         }}
                     >
-                        {assets.map((asset) => (
-                            <div
-                                key={asset.id}
-                                style={{
-                                    borderRadius: "4px",
-                                    overflow: "hidden",
-                                    border: "1px solid #e5e7eb",
-                                }}
-                            >
-                                <img
-                                    src={`http://localhost:8000/uploads/${asset.file_path}`}
-                                    alt={`Asset ${asset.id}`}
-                                    onClick={() => openAssetViewer(asset)}
+                        {assets.map((asset) => {
+                            const info = getFileInfo(asset);
+                            const isImage = info.kind === "image";
+
+                            return (
+                                <div
+                                    key={asset.id}
                                     style={{
-                                        width: "100%",
-                                        height: "60px",
-                                        objectFit: "cover",
-                                        display: "block",
-                                        cursor: "pointer",
+                                        borderRadius: "4px",
+                                        overflow: "hidden",
+                                        border: "1px solid #e5e7eb",
                                     }}
-                                />
-                            </div>
-                        ))}
+                                >
+                                    {isImage ? (
+                                        <img
+                                            src={`http://localhost:8000/uploads/${asset.file_path}`}
+                                            alt={`Asset ${asset.id}`}
+                                            onClick={() =>
+                                                openAssetViewer(asset)
+                                            }
+                                            style={{
+                                                width: "100%",
+                                                height: "60px",
+                                                objectFit: "cover",
+                                                display: "block",
+                                                cursor: "pointer",
+                                            }}
+                                        />
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                openAssetViewer(asset)
+                                            }
+                                            style={{
+                                                width: "100%",
+                                                height: "60px",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                border: "none",
+                                                backgroundColor: "#f9fafb",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    fontSize: "1.2rem",
+                                                }}
+                                            >
+                                                {info.icon}
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontSize: "0.65rem",
+                                                    marginTop: "0.1rem",
+                                                    color: "#4b5563",
+                                                    textTransform: "uppercase",
+                                                }}
+                                            >
+                                                {info.ext || "file"}
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -852,6 +939,8 @@ function ProjectsSection({ refreshKey = 0 }) {
     const isOwnerOfActiveAssetProject =
         activeAsset &&
         ownedProjects.some((p) => p.id === activeAsset.project_id);
+
+    const activeFileInfo = activeAsset ? getFileInfo(activeAsset) : null;
 
     return (
         <section style={{ marginTop: "1.5rem" }}>
@@ -1039,7 +1128,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
                         }}
                     >
-                        {/* LEFT: image */}
+                        {/* LEFT: preview */}
                         <div
                             style={{
                                 height: "100%",
@@ -1052,16 +1141,74 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 background: "#f9fafb",
                             }}
                         >
-                            <img
-                                src={`http://localhost:8000/uploads/${activeAsset.file_path}`}
-                                alt={`Asset ${activeAsset.id}`}
-                                style={{
-                                    maxWidth: "100%",
-                                    maxHeight: "100%",
-                                    objectFit: "contain",
-                                    display: "block",
-                                }}
-                            />
+                            {activeFileInfo &&
+                                activeFileInfo.kind === "image" ? (
+                                <img
+                                    src={`http://localhost:8000/uploads/${activeAsset.file_path}`}
+                                    alt={`Asset ${activeAsset.id}`}
+                                    style={{
+                                        maxWidth: "100%",
+                                        maxHeight: "100%",
+                                        objectFit: "contain",
+                                        display: "block",
+                                    }}
+                                />
+                            ) : (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "1rem",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: "2.6rem",
+                                        }}
+                                    >
+                                        {activeFileInfo?.icon || "📁"}
+                                    </div>
+                                    <div
+                                        style={{
+                                            marginTop: "0.6rem",
+                                            fontWeight: 600,
+                                            fontSize: "0.95rem",
+                                        }}
+                                    >
+                                        {activeFileInfo?.name || "File"}
+                                    </div>
+                                    <div
+                                        style={{
+                                            marginTop: "0.15rem",
+                                            fontSize: "0.8rem",
+                                            color: "#6b7280",
+                                        }}
+                                    >
+                                        {activeFileInfo?.label || "File"}
+                                    </div>
+                                    <a
+                                        href={`http://localhost:8000/uploads/${activeAsset.file_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{
+                                            marginTop: "0.75rem",
+                                            fontSize: "0.8rem",
+                                            padding:
+                                                "0.4rem 0.8rem",
+                                            borderRadius: "999px",
+                                            border: "1px solid #111827",
+                                            backgroundColor: "#111827",
+                                            color: "#ffffff",
+                                            textDecoration: "none",
+                                        }}
+                                    >
+                                        Open / download file
+                                    </a>
+                                </div>
+                            )}
                         </div>
 
                         {/* RIGHT: comments + AI */}

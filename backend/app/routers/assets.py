@@ -1,19 +1,12 @@
-# backend/routers/assets.py
+# backend/app/routers/assets.py
 
 import os
 from typing import List
 from datetime import datetime
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    UploadFile,
-    File,
-    HTTPException,
-    status,
-)
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 
 from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
@@ -23,27 +16,62 @@ router = APIRouter(prefix="/projects", tags=["assets"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ---- allowed MIME types & extensions ----
 
-def _get_project_for_user_or_404(
+IMAGE_CONTENT_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+}
+
+DOC_CONTENT_TYPES = {
+    "application/pdf",
+    "application/msword",  # .doc
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # .docx
+    "application/vnd.ms-excel",  # .xls
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
+}
+
+ALLOWED_CONTENT_TYPES = IMAGE_CONTENT_TYPES | DOC_CONTENT_TYPES
+
+ALLOWED_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+}
+
+
+def _get_project_for_user_with_access_or_404(
     db: Session,
     user_id: int,
     project_id: int,
 ) -> models.Project:
     """
-    Return the project if the user has access (owner OR collaborator),
-    otherwise raise 404.
+    Project is visible if the user is:
+    - the project owner, OR
+    - a participant (collaborator) on that project.
     """
     project = (
         db.query(models.Project)
         .outerjoin(
             models.ProjectParticipant,
-            models.ProjectParticipant.project_id == models.Project.id,
+            and_(
+                models.ProjectParticipant.project_id == models.Project.id,
+                models.ProjectParticipant.user_id == user_id,
+            ),
         )
         .filter(
             models.Project.id == project_id,
             or_(
                 models.Project.owner_id == user_id,
-                models.ProjectParticipant.user_id == user_id,
+                models.ProjectParticipant.id.isnot(None),
             ),
         )
         .first()
@@ -52,33 +80,7 @@ def _get_project_for_user_or_404(
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found or you don't have access.",
-        )
-
-    return project
-
-
-def _get_project_for_owner_or_404(
-    db: Session,
-    user_id: int,
-    project_id: int,
-) -> models.Project:
-    """
-    Strict owner-only check (for destructive actions like deleting assets).
-    """
-    project = (
-        db.query(models.Project)
-        .filter(
-            models.Project.id == project_id,
-            models.Project.owner_id == user_id,
-        )
-        .first()
-    )
-
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found or you are not the owner.",
+            detail="Project not found or access denied",
         )
 
     return project
@@ -96,37 +98,34 @@ async def upload_asset(
     current_user: models.User = Depends(get_current_user_from_header),
 ):
     """
-    Upload an image asset for a given project.
+    Upload an asset for a given project.
 
-    Allowed:
-      - project owner
-      - collaborators (ProjectParticipant rows)
+    Owner + collaborators can upload.
+    Allowed: images (png/jpg/jpeg/webp), PDF, Word, Excel.
     """
-    project = _get_project_for_user_or_404(db, current_user.id, project_id)
+    project = _get_project_for_user_with_access_or_404(
+        db, current_user.id, project_id
+    )
 
-    if file.content_type not in (
-        "image/png",
-        "image/jpeg",
-        "image/jpg",
-        "image/webp",
-    ):
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only image uploads are allowed.",
+            detail=(
+                "Unsupported file type. "
+                "Allowed: PNG, JPG/JPEG, WEBP, PDF, Word (.doc/.docx), Excel (.xls/.xlsx)."
+            ),
         )
 
-    # Build file name
+    # Build filename – keep original extension when it's allowed
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
-    original_ext = os.path.splitext(file.filename or "")[1].lower()
-    ext = (
-        original_ext
-        if original_ext in [".png", ".jpg", ".jpeg", ".webp"]
-        else ".png"
-    )
+    original_name = file.filename or "asset"
+    original_ext = os.path.splitext(original_name)[1].lower()
+    ext = original_ext if original_ext in ALLOWED_EXTENSIONS else ""
+
     filename = f"project_{project.id}_{timestamp}{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
 
-    # Save file to disk
+    # Save file
     content = await file.read()
     with open(file_path, "wb") as f:
         f.write(content)
@@ -140,8 +139,8 @@ async def upload_asset(
 
     asset = models.Asset(
         project_id=project.id,
-        user_id=current_user.id,  # make sure this field exists in your model
-        file_path=filename,       # relative filename
+        user_id=current_user.id,
+        file_path=filename,  # relative filename
         version=current_count + 1,
     )
 
@@ -149,19 +148,18 @@ async def upload_asset(
     db.commit()
     db.refresh(asset)
 
-    # NEW: log activity for asset upload
+    # Activity log: asset uploaded
     display_name = current_user.display_name or current_user.email
     activity = models.Activity(
         project_id=project.id,
         user_id=current_user.id,
         type="asset_uploaded",
-        message=f"{display_name} uploaded a new asset.",
+        message=f"{display_name} uploaded an asset.",
     )
     db.add(activity)
     db.commit()
 
     return asset
-
 
 
 @router.get(
@@ -173,14 +171,7 @@ def list_assets(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_from_header),
 ):
-    """
-    List assets for a project.
-
-    Allowed:
-      - project owner
-      - collaborators
-    """
-    _ = _get_project_for_user_or_404(db, current_user.id, project_id)
+    _ = _get_project_for_user_with_access_or_404(db, current_user.id, project_id)
 
     assets = (
         db.query(models.Asset)
@@ -202,12 +193,22 @@ def delete_asset(
     current_user: models.User = Depends(get_current_user_from_header),
 ):
     """
-    Delete an asset and its file.
-
-    For now we keep this OWNER-ONLY (collaborators can upload but not delete
-    other people's assets). Later we can extend with per-uploader rules.
+    Delete asset (and comments + file) – owner only.
     """
-    project = _get_project_for_owner_or_404(db, current_user.id, project_id)
+    # Owner only
+    project = (
+        db.query(models.Project)
+        .filter(
+            models.Project.id == project_id,
+            models.Project.owner_id == current_user.id,
+        )
+        .first()
+    )
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the project owner can delete assets",
+        )
 
     asset = (
         db.query(models.Asset)
@@ -217,11 +218,10 @@ def delete_asset(
         )
         .first()
     )
-
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Asset not found.",
+            detail="Asset not found",
         )
 
     # Delete comments for this asset
@@ -230,18 +230,19 @@ def delete_asset(
         .filter(models.Comment.asset_id == asset.id)
         .all()
     )
-    for c in comments:
-        db.delete(c)
+    for comment in comments:
+        db.delete(comment)
 
-    # Delete the file on disk
+    # Delete associated file if it exists
     if asset.file_path:
-        file_path = os.path.join(UPLOAD_DIR, asset.file_path)
-        if os.path.exists(file_path):
+        disk_path = os.path.join(UPLOAD_DIR, asset.file_path)
+        if os.path.exists(disk_path):
             try:
-                os.remove(file_path)
+                os.remove(disk_path)
             except OSError:
-                # Ignore disk errors in this MVP
+                # ignore file delete errors
                 pass
 
     db.delete(asset)
     db.commit()
+    return
