@@ -852,8 +852,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     padding: "0.12rem 0.35rem",
                                     borderRadius: "999px",
                                     border: `1px solid ${isActive
-                                            ? "rgba(129,140,248,0.9)"
-                                            : "rgba(55,65,81,0.9)"
+                                        ? "rgba(129,140,248,0.9)"
+                                        : "rgba(55,65,81,0.9)"
                                         }`,
                                     backgroundColor: isActive
                                         ? "rgba(30,64,175,0.5)"
@@ -1426,7 +1426,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             </form>
 
             {/* Owned projects */}
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div id="fs-my-projects-section" style={{ marginBottom: "1.5rem" }}>
                 <h3
                     style={{
                         marginBottom: "0.5rem",
@@ -1555,12 +1555,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                             boxShadow: "0 24px 60px rgba(0,0,0,0.85)",
                             border: "1px solid rgba(30,64,175,0.8)",
                             color: "#e5e7eb",
+                            overflow: "hidden",
                         }}
                     >
                         {/* LEFT: preview */}
                         <div
                             style={{
                                 height: "100%",
+                                minHeight: 0,
+                                overflow: "hidden",
                                 borderRadius: "10px",
                                 overflow: "auto",
                                 border:
@@ -1648,6 +1651,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                         <div
                             style={{
                                 height: "100%",
+                                minHeight: 0,
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: "0.5rem",
@@ -1867,6 +1871,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             <div
                                 style={{
                                     flexGrow: 1,
+                                    minHeight: 0,
                                     overflowY: "auto",
                                     paddingRight: "0.25rem",
                                     borderRadius: "8px",

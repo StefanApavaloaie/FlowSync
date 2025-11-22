@@ -10,7 +10,15 @@ function Dashboard() {
     const handleInvitesChanged = () => {
         setProjectsRefreshKey((prev) => prev + 1);
     };
-
+    const scrollToMyProjects = () => {
+        const el = document.getElementById("fs-my-projects-section");
+        if (el) {
+            el.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        }
+    };
     return (
         <div className="fs-app-shell">
             <header className="fs-header">
@@ -45,15 +53,12 @@ function Dashboard() {
             <main className="fs-main-shell">
                 <section className="fs-hero">
                     <div className="fs-hero-eyebrow">Design Collaboration Platform</div>
-                    <h1 className="fs-hero-title">Multiplayer feedback for your design files</h1>
+                    <h1 className="fs-hero-title">Multiplayer feedback for your design files or documents</h1>
                     <p className="fs-hero-subtitle">
                         Collaborate seamlessly with your team, manage projects efficiently, and streamline your design workflow. Upload files, collect comments, and keep everything in one shared space.
                     </p>
                     <div className="fs-hero-actions">
-                        <button className="fs-button-primary">
-                            ➕ Create New Project
-                        </button>
-                        <button className="fs-button-ghost" style={{ padding: '0.8rem 1.6rem' }}>
+                        <button className="fs-button-ghost" style={{ padding: '0.8rem 1.6rem' }} onClick={scrollToMyProjects}>
                             📂 Jump to my projects
                         </button>
                     </div>
