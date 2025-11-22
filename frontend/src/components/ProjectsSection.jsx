@@ -74,7 +74,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [newDeadline, setNewDeadline] = useState(""); // NEW: deadline for new project
+    const [newDeadline, setNewDeadline] = useState("");
     const [uploadingFor, setUploadingFor] = useState(null);
 
     const [activeAsset, setActiveAsset] = useState(null);
@@ -83,7 +83,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [loadingComments, setLoadingComments] = useState(false);
     const [submittingComment, setSubmittingComment] = useState(false);
 
-    const [replyTo, setReplyTo] = useState(null); // which comment we reply to
+    const [replyTo, setReplyTo] = useState(null);
 
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
@@ -207,7 +207,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                 {
                     name: name.trim(),
                     description: description.trim() || null,
-                    deadline: newDeadline || null, // NEW
+                    deadline: newDeadline || null,
                 },
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -304,10 +304,8 @@ function ProjectsSection({ refreshKey = 0 }) {
     };
 
     const handleUpdateProjectDeadline = async (project, dateValue) => {
-        // dateValue is either "" or "YYYY-MM-DD"
-        const deadline = dateValue && dateValue.trim
-            ? dateValue.trim()
-            : dateValue || null;
+        const deadline =
+            dateValue && dateValue.trim ? dateValue.trim() : dateValue || null;
 
         try {
             const res = await api.patch(
@@ -331,13 +329,9 @@ function ProjectsSection({ refreshKey = 0 }) {
         if (!confirmLeave) return;
 
         try {
-            await api.post(
-                `/projects/${projectId}/leave`,
-                null,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
+            await api.post(`/projects/${projectId}/leave`, null, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
 
             setSharedProjects((prev) =>
                 prev.filter((p) => p.id !== projectId)
@@ -650,12 +644,9 @@ function ProjectsSection({ refreshKey = 0 }) {
         setLoadingActivity(true);
 
         try {
-            const res = await api.get(
-                `/projects/${project.id}/activity`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
+            const res = await api.get(`/projects/${project.id}/activity`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             setActivityItems(res.data);
         } catch (err) {
             console.error("Failed to load activity", err);
@@ -745,8 +736,10 @@ function ProjectsSection({ refreshKey = 0 }) {
                     marginBottom: "0.35rem",
                     paddingBottom: "0.25rem",
                     borderBottom:
-                        depth === 0 ? "1px solid #e5e7eb" : "none",
+                        depth === 0 ? "1px solid #1f2937" : "none",
                     marginLeft: indentPx,
+                    color: "#e5e7eb",
+                    fontSize: "0.85rem",
                 }}
             >
                 <div
@@ -762,7 +755,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             style={{
                                 fontSize: "0.8rem",
                                 fontWeight: 500,
-                                color: "#374151",
+                                color: "#e5e7eb",
                             }}
                         >
                             {authorName}
@@ -790,7 +783,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             style={{
                                 border: "none",
                                 background: "transparent",
-                                color: "#4b5563",
+                                color: "#93c5fd",
                                 fontSize: "0.75rem",
                                 cursor: "pointer",
                             }}
@@ -806,7 +799,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 style={{
                                     border: "none",
                                     background: "transparent",
-                                    color: "#ef4444",
+                                    color: "#fca5a5",
                                     fontSize: "0.75rem",
                                     cursor: "pointer",
                                 }}
@@ -859,14 +852,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     padding: "0.12rem 0.35rem",
                                     borderRadius: "999px",
                                     border: `1px solid ${isActive
-                                            ? "#4f46e5"
-                                            : "#e5e7eb"
+                                            ? "rgba(129,140,248,0.9)"
+                                            : "rgba(55,65,81,0.9)"
                                         }`,
                                     backgroundColor: isActive
-                                        ? "#eef2ff"
-                                        : "#f9fafb",
+                                        ? "rgba(30,64,175,0.5)"
+                                        : "rgba(15,23,42,0.9)",
                                     fontSize: "0.75rem",
                                     cursor: "pointer",
+                                    color: "#e5e7eb",
                                 }}
                             >
                                 <span>{emoji}</span>
@@ -874,7 +868,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     <span
                                         style={{
                                             fontSize: "0.7rem",
-                                            color: "#4b5563",
+                                            color: "#cbd5f5",
                                         }}
                                     >
                                         {countLabel}
@@ -898,7 +892,11 @@ function ProjectsSection({ refreshKey = 0 }) {
     // ---- rendering helpers ----
 
     if (loadingProjects) {
-        return <p>Loading projects...</p>;
+        return (
+            <section className="fs-section-projects">
+                <p style={{ color: "#9ca3af" }}>Loading projects...</p>
+            </section>
+        );
     }
 
     const renderProjectCard = (
@@ -912,15 +910,10 @@ function ProjectsSection({ refreshKey = 0 }) {
         return (
             <div
                 key={project.id}
+                className="fs-project-card"
+                data-archived={archived ? "true" : "false"}
                 style={{
-                    padding: "0.85rem",
-                    borderRadius: "8px",
-                    border: "1px solid #e0e0e0",
-                    backgroundColor: archived ? "#f9fafb" : "#ffffff",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.35rem",
-                    opacity: archived ? 0.8 : 1,
+                    opacity: archived ? 0.85 : 1,
                 }}
             >
                 <div
@@ -931,22 +924,19 @@ function ProjectsSection({ refreshKey = 0 }) {
                         gap: "0.5rem",
                     }}
                 >
-                    <div
-                        style={{
-                            fontWeight: 600,
-                            fontSize: "0.98rem",
-                        }}
-                    >
+                    <div className="fs-project-card-title">
                         {project.name}
                     </div>
                     {archived && (
                         <span
                             style={{
                                 fontSize: "0.7rem",
-                                padding: "0.1rem 0.35rem",
+                                padding: "0.1rem 0.45rem",
                                 borderRadius: "999px",
-                                backgroundColor: "#e5e7eb",
-                                color: "#4b5563",
+                                backgroundColor: "rgba(15,23,42,0.9)",
+                                border:
+                                    "1px solid rgba(148,163,184,0.6)",
+                                color: "#9ca3af",
                             }}
                         >
                             Archived
@@ -955,12 +945,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                 </div>
 
                 {project.description && (
-                    <div
-                        style={{
-                            fontSize: "0.85rem",
-                            color: "#555",
-                        }}
-                    >
+                    <div className="fs-project-card-desc">
                         {project.description}
                     </div>
                 )}
@@ -970,14 +955,21 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         marginTop: "0.25rem",
                         fontSize: "0.8rem",
-                        color: "#4b5563",
+                        color: "#e5e7eb",
                         display: "flex",
                         alignItems: "center",
                         gap: "0.4rem",
                         flexWrap: "wrap",
                     }}
                 >
-                    <span style={{ fontWeight: 500 }}>Deadline:</span>
+                    <span
+                        style={{
+                            fontWeight: 500,
+                            color: "#bfdbfe",
+                        }}
+                    >
+                        Deadline:
+                    </span>
                     {isOwned && !archived ? (
                         <>
                             <input
@@ -989,18 +981,14 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         e.target.value
                                     )
                                 }
-                                style={{
-                                    fontSize: "0.78rem",
-                                    padding: "0.2rem 0.4rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #d1d5db",
-                                }}
+                                className="fs-date"
+                                style={{ fontSize: "0.78rem" }}
                             />
                             {!project.deadline && (
                                 <span
                                     style={{
                                         fontSize: "0.75rem",
-                                        color: "#9ca3af",
+                                        color: "#6b7280",
                                     }}
                                 >
                                     Not set
@@ -1008,7 +996,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             )}
                         </>
                     ) : (
-                        <span>
+                        <span style={{ color: "#9ca3af" }}>
                             {project.deadline || "Not set"}
                         </span>
                     )}
@@ -1026,14 +1014,17 @@ function ProjectsSection({ refreshKey = 0 }) {
                     <label
                         style={{
                             fontSize: "0.78rem",
-                            padding: "0.25rem 0.6rem",
-                            borderRadius: "4px",
-                            border: "1px solid #ccc",
+                            padding: "0.25rem 0.8rem",
+                            borderRadius: "999px",
+                            border:
+                                "1px solid rgba(96,165,250,0.6)",
                             cursor:
                                 uploadingFor === project.id || archived
                                     ? "default"
                                     : "pointer",
-                            backgroundColor: "#f9fafb",
+                            background:
+                                "linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,64,175,0.8))",
+                            color: "#e5e7eb",
                             opacity:
                                 uploadingFor === project.id || archived
                                     ? 0.6
@@ -1055,12 +1046,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                     <button
                         onClick={() => loadAssets(project.id)}
                         style={{
-                            padding: "0.25rem 0.6rem",
+                            padding: "0.25rem 0.8rem",
                             fontSize: "0.78rem",
-                            borderRadius: "4px",
-                            border: "1px solid #e5e7eb",
-                            backgroundColor: "#f9fafb",
+                            borderRadius: "999px",
+                            border:
+                                "1px solid rgba(148,163,184,0.5)",
+                            background:
+                                "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
                             cursor: "pointer",
+                            color: "#e5e7eb",
                         }}
                     >
                         Refresh assets
@@ -1071,12 +1065,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                             <button
                                 onClick={() => handleRenameProject(project)}
                                 style={{
-                                    padding: "0.25rem 0.6rem",
+                                    padding: "0.25rem 0.8rem",
                                     fontSize: "0.78rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #e5e7eb",
-                                    backgroundColor: "#ffffff",
+                                    borderRadius: "999px",
+                                    border:
+                                        "1px solid rgba(148,163,184,0.5)",
+                                    background:
+                                        "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
                                     cursor: "pointer",
+                                    color: "#e5e7eb",
                                 }}
                             >
                                 Rename
@@ -1087,12 +1084,15 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     handleArchiveToggle(project, !archived)
                                 }
                                 style={{
-                                    padding: "0.25rem 0.6rem",
+                                    padding: "0.25rem 0.8rem",
                                     fontSize: "0.78rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #e5e7eb",
-                                    backgroundColor: "#ffffff",
+                                    borderRadius: "999px",
+                                    border:
+                                        "1px solid rgba(148,163,184,0.5)",
+                                    background:
+                                        "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
                                     cursor: "pointer",
+                                    color: "#e5e7eb",
                                 }}
                             >
                                 {archived ? "Unarchive" : "Archive"}
@@ -1101,12 +1101,14 @@ function ProjectsSection({ refreshKey = 0 }) {
                             <button
                                 onClick={() => handleDeleteProject(project.id)}
                                 style={{
-                                    padding: "0.25rem 0.6rem",
+                                    padding: "0.25rem 0.8rem",
                                     fontSize: "0.78rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #fca5a5",
-                                    backgroundColor: "#fef2f2",
+                                    borderRadius: "999px",
+                                    border:
+                                        "1px solid rgba(248,113,113,0.8)",
+                                    backgroundColor: "rgba(127,29,29,0.35)",
                                     cursor: "pointer",
+                                    color: "#fecaca",
                                 }}
                             >
                                 Delete
@@ -1118,12 +1120,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                         <button
                             onClick={() => handleLeaveProject(project.id)}
                             style={{
-                                padding: "0.25rem 0.6rem",
+                                padding: "0.25rem 0.8rem",
                                 fontSize: "0.78rem",
-                                borderRadius: "4px",
-                                border: "1px solid #e5e7eb",
-                                backgroundColor: "#fff7ed",
-                                color: "#c2410c",
+                                borderRadius: "999px",
+                                border:
+                                    "1px solid rgba(248,153,72,0.8)",
+                                backgroundColor: "rgba(120,53,15,0.5)",
+                                color: "#fed7aa",
                                 cursor: "pointer",
                             }}
                         >
@@ -1151,26 +1154,29 @@ function ProjectsSection({ refreshKey = 0 }) {
                             style={{
                                 flexGrow: 1,
                                 padding: "0.35rem 0.6rem",
-                                borderRadius: "4px",
-                                border: "1px solid #d1d5db",
+                                borderRadius: "999px",
+                                border:
+                                    "1px solid rgba(148,163,184,0.6)",
                                 fontSize: "0.8rem",
+                                backgroundColor: "rgba(15,23,42,0.9)",
+                                color: "#e5e7eb",
                             }}
                         />
                         <button
                             type="button"
                             onClick={() => handleInvite(project.id)}
                             style={{
-                                padding: "0.35rem 0.7rem",
-                                borderRadius: "4px",
+                                padding: "0.35rem 0.8rem",
+                                borderRadius: "999px",
                                 border: "none",
                                 fontSize: "0.8rem",
                                 cursor: inviteEmail.trim()
                                     ? "pointer"
                                     : "default",
-                                backgroundColor: inviteEmail.trim()
-                                    ? "#111827"
-                                    : "#9ca3af",
+                                background:
+                                    "linear-gradient(135deg, #0ea5e9, #2563eb)",
                                 color: "#ffffff",
+                                opacity: inviteEmail.trim() ? 1 : 0.45,
                             }}
                             disabled={!inviteEmail.trim()}
                         >
@@ -1196,7 +1202,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             background: "transparent",
                             padding: 0,
                             cursor: "pointer",
-                            color: "#2563eb",
+                            color: "#60a5fa",
                             textDecoration: "underline",
                         }}
                     >
@@ -1223,10 +1229,12 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 <div
                                     key={asset.id}
                                     style={{
-                                        borderRadius: "4px",
+                                        borderRadius: "8px",
                                         overflow: "hidden",
-                                        border: "1px solid #e5e7eb",
-                                        backgroundColor: "#ffffff",
+                                        border:
+                                            "1px solid rgba(31,41,55,0.9)",
+                                        backgroundColor:
+                                            "rgba(15,23,42,0.95)",
                                         display: "flex",
                                         flexDirection: "column",
                                     }}
@@ -1260,7 +1268,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                                                 alignItems: "center",
                                                 justifyContent: "center",
                                                 border: "none",
-                                                backgroundColor: "#f9fafb",
+                                                backgroundColor:
+                                                    "rgba(15,23,42,0.95)",
                                                 cursor: "pointer",
                                             }}
                                         >
@@ -1275,7 +1284,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                                 style={{
                                                     fontSize: "0.65rem",
                                                     marginTop: "0.1rem",
-                                                    color: "#4b5563",
+                                                    color: "#9ca3af",
                                                     textTransform: "uppercase",
                                                 }}
                                             >
@@ -1287,11 +1296,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     <div
                                         style={{
                                             padding: "0.1rem 0.25rem",
-                                            borderTop: "1px solid #e5e7eb",
+                                            borderTop:
+                                                "1px solid rgba(31,41,55,0.9)",
                                             fontSize: "0.65rem",
                                             textAlign: "center",
-                                            backgroundColor: "#f9fafb",
-                                            color: "#4b5563",
+                                            backgroundColor:
+                                                "rgba(17,24,39,0.95)",
+                                            color: "#cbd5f5",
                                             whiteSpace: "nowrap",
                                             overflow: "hidden",
                                             textOverflow: "ellipsis",
@@ -1338,21 +1349,18 @@ function ProjectsSection({ refreshKey = 0 }) {
     const commentTree = buildCommentTree();
 
     return (
-        <section style={{ marginTop: "1.5rem" }}>
+        <section className="fs-section-projects">
             <h2 style={{ marginBottom: "0.75rem" }}>Projects</h2>
 
-            {/* Create project form (for everyone, but they become owner) */}
+            {/* Create project form */}
             <form
                 onSubmit={handleCreate}
+                className="fs-create-card"
                 style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "0.5rem",
-                    marginBottom: "1.5rem",
-                    padding: "0.75rem",
-                    borderRadius: "8px",
-                    border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
+                    gap: "0.6rem",
+                    marginBottom: "1.8rem",
                 }}
             >
                 <input
@@ -1360,11 +1368,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                     placeholder="Project name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    style={{
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: "6px",
-                        border: "1px solid #ccc",
-                    }}
+                    className="fs-input"
                     required
                 />
                 <textarea
@@ -1372,12 +1376,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}
-                    style={{
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: "6px",
-                        border: "1px solid #ccc",
-                        resize: "vertical",
-                    }}
+                    className="fs-textarea"
                 />
                 <div
                     style={{
@@ -1385,12 +1384,14 @@ function ProjectsSection({ refreshKey = 0 }) {
                         alignItems: "center",
                         gap: "0.5rem",
                         flexWrap: "wrap",
+                        fontSize: "0.85rem",
+                        color: "#cbd5f5",
                     }}
                 >
                     <label
                         style={{
                             fontSize: "0.8rem",
-                            color: "#4b5563",
+                            color: "#bfdbfe",
                         }}
                     >
                         Deadline:
@@ -1399,17 +1400,12 @@ function ProjectsSection({ refreshKey = 0 }) {
                         type="date"
                         value={newDeadline}
                         onChange={(e) => setNewDeadline(e.target.value)}
-                        style={{
-                            padding: "0.4rem 0.75rem",
-                            borderRadius: "6px",
-                            border: "1px solid #ccc",
-                            fontSize: "0.85rem",
-                        }}
+                        className="fs-date"
                     />
                     <span
                         style={{
                             fontSize: "0.75rem",
-                            color: "#9ca3af",
+                            color: "#6b7280",
                         }}
                     >
                         (optional)
@@ -1418,16 +1414,11 @@ function ProjectsSection({ refreshKey = 0 }) {
                 <button
                     type="submit"
                     disabled={creating}
+                    className="fs-primary-button"
                     style={{
                         alignSelf: "flex-start",
-                        padding: "0.4rem 0.9rem",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "0.9rem",
-                        backgroundColor: "#111827",
-                        color: "#ffffff",
-                        opacity: creating ? 0.7 : 1,
+                        opacity: creating ? 0.8 : 1,
+                        cursor: creating ? "default" : "pointer",
                     }}
                 >
                     {creating ? "Creating..." : "Create project"}
@@ -1440,15 +1431,16 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         marginBottom: "0.5rem",
                         fontSize: "0.95rem",
+                        color: "#f9fafb",
                     }}
                 >
                     My projects
                 </h3>
                 {!hasOwned ? (
-                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
-                        You have no projects yet. Create one to start managing
-                        design feedback.
-                    </p>
+                    <div className="fs-empty-card">
+                        You have no projects yet. Create one to start
+                        managing design feedback.
+                    </div>
                 ) : (
                     <div
                         style={{
@@ -1465,21 +1457,22 @@ function ProjectsSection({ refreshKey = 0 }) {
                 )}
             </div>
 
-            {/* Archived projects (owned) */}
+            {/* Archived projects */}
             <div style={{ marginBottom: "1.5rem" }}>
                 <h3
                     style={{
                         marginBottom: "0.5rem",
                         fontSize: "0.95rem",
+                        color: "#f9fafb",
                     }}
                 >
                     Archived projects
                 </h3>
                 {!hasArchived ? (
-                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
-                        No archived projects. Archive a project to hide it from
-                        your main list without deleting it.
-                    </p>
+                    <div className="fs-empty-card">
+                        No archived projects. Archive a project to hide it
+                        from your main list without deleting it.
+                    </div>
                 ) : (
                     <div
                         style={{
@@ -1505,15 +1498,16 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         marginBottom: "0.5rem",
                         fontSize: "0.95rem",
+                        color: "#f9fafb",
                     }}
                 >
                     Projects I'm collaborating on
                 </h3>
                 {!hasShared ? (
-                    <p style={{ color: "#666", fontSize: "0.9rem" }}>
-                        No collaborations yet. Accept an invite to see shared
-                        projects here.
-                    </p>
+                    <div className="fs-empty-card">
+                        No collaborations yet. Accept an invite to see
+                        shared projects here.
+                    </div>
                 ) : (
                     <div
                         style={{
@@ -1537,7 +1531,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         position: "fixed",
                         inset: 0,
-                        backgroundColor: "rgba(0,0,0,0.45)",
+                        background:
+                            "radial-gradient(circle at top, rgba(37,99,235,0.3), transparent 55%), rgba(0,0,0,0.75)",
                         display: "flex",
                         justifyContent: "center",
                         alignItems: "center",
@@ -1549,27 +1544,32 @@ function ProjectsSection({ refreshKey = 0 }) {
                         style={{
                             width: "min(1000px, 96vw)",
                             height: "85vh",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "10px",
+                            background:
+                                "linear-gradient(135deg, rgba(15,23,42,0.98), rgba(15,23,42,0.96))",
+                            borderRadius: "16px",
                             padding: "1rem",
                             display: "grid",
                             gridTemplateColumns:
                                 "minmax(0, 2.2fr) minmax(260px, 1fr)",
                             gap: "0.75rem",
-                            boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
+                            boxShadow: "0 24px 60px rgba(0,0,0,0.85)",
+                            border: "1px solid rgba(30,64,175,0.8)",
+                            color: "#e5e7eb",
                         }}
                     >
                         {/* LEFT: preview */}
                         <div
                             style={{
                                 height: "100%",
-                                borderRadius: "6px",
+                                borderRadius: "10px",
                                 overflow: "auto",
-                                border: "1px solid #e5e7eb",
+                                border:
+                                    "1px solid rgba(31,41,55,0.95)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                background: "#f9fafb",
+                                background:
+                                    "radial-gradient(circle at top left, rgba(30,64,175,0.22), transparent 55%), #020617",
                             }}
                         >
                             {activeFileInfo &&
@@ -1615,7 +1615,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         style={{
                                             marginTop: "0.15rem",
                                             fontSize: "0.8rem",
-                                            color: "#6b7280",
+                                            color: "#9ca3af",
                                         }}
                                     >
                                         {activeFileInfo?.label || "File"}
@@ -1630,8 +1630,10 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             padding:
                                                 "0.4rem 0.8rem",
                                             borderRadius: "999px",
-                                            border: "1px solid #111827",
-                                            backgroundColor: "#111827",
+                                            border:
+                                                "1px solid rgba(96,165,250,0.9)",
+                                            background:
+                                                "linear-gradient(135deg,#1d4ed8,#2563eb)",
                                             color: "#ffffff",
                                             textDecoration: "none",
                                         }}
@@ -1663,6 +1665,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     style={{
                                         margin: 0,
                                         fontSize: "1rem",
+                                        color: "#f9fafb",
                                     }}
                                 >
                                     Comments
@@ -1680,15 +1683,17 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         disabled={loadingAi}
                                         style={{
                                             padding: "0.25rem 0.5rem",
-                                            borderRadius: "4px",
-                                            border: "1px solid #111827",
+                                            borderRadius: "8px",
+                                            border:
+                                                "1px solid rgba(129,140,248,0.9)",
                                             fontSize: "0.75rem",
-                                            backgroundColor: "#111827",
-                                            color: "#ffffff",
+                                            background:
+                                                "linear-gradient(135deg,rgba(30,64,175,0.9),rgba(129,140,248,0.9))",
+                                            color: "#eef2ff",
                                             cursor: loadingAi
                                                 ? "default"
                                                 : "pointer",
-                                            opacity: loadingAi ? 0.7 : 1,
+                                            opacity: loadingAi ? 0.8 : 1,
                                             width: "10rem",
                                             height: "2rem",
                                         }}
@@ -1706,11 +1711,14 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         <button
                                             onClick={handleDeleteAsset}
                                             style={{
-                                                padding: "0.25rem 0.6rem",
-                                                borderRadius: "4px",
-                                                border: "1px solid #ef4444",
-                                                backgroundColor: "#fef2f2",
-                                                color: "#b91c1c",
+                                                padding:
+                                                    "0.25rem 0.6rem",
+                                                borderRadius: "8px",
+                                                border:
+                                                    "1px solid rgba(248,113,113,0.8)",
+                                                backgroundColor:
+                                                    "rgba(127,29,29,0.35)",
+                                                color: "#fecaca",
                                                 fontSize: "0.75rem",
                                                 cursor: "pointer",
                                             }}
@@ -1726,7 +1734,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             background: "transparent",
                                             cursor: "pointer",
                                             fontSize: "0.9rem",
-                                            color: "#6b7280",
+                                            color: "#9ca3af",
                                         }}
                                     >
                                         ✕
@@ -1738,7 +1746,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 <div
                                     style={{
                                         fontSize: "0.75rem",
-                                        color: "#6b7280",
+                                        color: "#9ca3af",
                                     }}
                                 >
                                     Uploaded by {uploadedMeta.uploaderText}
@@ -1752,7 +1760,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 <div
                                     style={{
                                         fontSize: "0.8rem",
-                                        color: "#374151",
+                                        color: "#e5e7eb",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "0.4rem",
@@ -1777,9 +1785,12 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             style={{
                                                 fontSize: "0.78rem",
                                                 padding: "0.2rem 0.4rem",
-                                                borderRadius: "4px",
-                                                border: "1px solid #d1d5db",
-                                                backgroundColor: "#ffffff",
+                                                borderRadius: "6px",
+                                                border:
+                                                    "1px solid rgba(55,65,81,0.9)",
+                                                backgroundColor:
+                                                    "rgba(17,24,39,0.98)",
+                                                color: "#e5e7eb",
                                             }}
                                         >
                                             {ASSET_STATUS_OPTIONS.map(
@@ -1807,11 +1818,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                             {aiSuggestions && showAi && (
                                 <div
                                     style={{
-                                        borderRadius: "4px",
-                                        border: "1px solid #e5e7eb",
-                                        padding: "0.4rem",
+                                        borderRadius: "8px",
+                                        border:
+                                            "1px solid rgba(30,64,175,0.85)",
+                                        padding: "0.45rem 0.55rem",
                                         fontSize: "0.78rem",
-                                        backgroundColor: "#f9fafb",
+                                        background:
+                                            "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.9))",
                                         maxHeight: "28%",
                                         overflowY: "auto",
                                     }}
@@ -1821,6 +1834,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             fontWeight: 600,
                                             marginBottom: "0.25rem",
                                             fontSize: "0.8rem",
+                                            color: "#e5e7eb",
                                         }}
                                     >
                                         Automated visual review
@@ -1829,6 +1843,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         style={{
                                             paddingLeft: "1rem",
                                             margin: 0,
+                                            color: "#cbd5f5",
                                         }}
                                     >
                                         {aiSuggestions.suggestions.map(
@@ -1854,20 +1869,32 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     flexGrow: 1,
                                     overflowY: "auto",
                                     paddingRight: "0.25rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #f3f4f6",
+                                    borderRadius: "8px",
+                                    border:
+                                        "1px solid rgba(31,41,55,0.95)",
                                     padding: "0.4rem",
                                     fontSize: "0.85rem",
-                                    backgroundColor: "#fafafa",
+                                    backgroundColor: "rgba(15,23,42,0.9)",
                                 }}
                             >
                                 {loadingComments ? (
-                                    <p style={{ margin: 0, color: "#6b7280" }}>
+                                    <p
+                                        style={{
+                                            margin: 0,
+                                            color: "#9ca3af",
+                                        }}
+                                    >
                                         Loading comments...
                                     </p>
                                 ) : commentTree.length === 0 ? (
-                                    <p style={{ margin: 0, color: "#6b7280" }}>
-                                        No comments yet. Start the discussion.
+                                    <p
+                                        style={{
+                                            margin: 0,
+                                            color: "#9ca3af",
+                                        }}
+                                    >
+                                        No comments yet. Start the
+                                        discussion.
                                     </p>
                                 ) : (
                                     commentTree.map((comment) =>
@@ -1883,7 +1910,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         marginTop: "0.3rem",
                                         marginBottom: "0.1rem",
                                         fontSize: "0.8rem",
-                                        color: "#4b5563",
+                                        color: "#e5e7eb",
                                         display: "flex",
                                         justifyContent: "space-between",
                                         alignItems: "center",
@@ -1905,7 +1932,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             border: "none",
                                             background: "transparent",
                                             fontSize: "0.75rem",
-                                            color: "#6b7280",
+                                            color: "#9ca3af",
                                             cursor: "pointer",
                                         }}
                                     >
@@ -1929,19 +1956,24 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     style={{
                                         flexGrow: 1,
                                         padding: "0.35rem 0.6rem",
-                                        borderRadius: "4px",
-                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        border:
+                                            "1px solid rgba(55,65,81,0.9)",
                                         fontSize: "0.85rem",
+                                        backgroundColor:
+                                            "rgba(15,23,42,0.95)",
+                                        color: "#e5e7eb",
                                     }}
                                 />
                                 <button
                                     type="submit"
                                     disabled={
-                                        submittingComment || !newComment.trim()
+                                        submittingComment ||
+                                        !newComment.trim()
                                     }
                                     style={{
-                                        padding: "0.35rem 0.7rem",
-                                        borderRadius: "4px",
+                                        padding: "0.35rem 0.8rem",
+                                        borderRadius: "999px",
                                         border: "none",
                                         fontSize: "0.8rem",
                                         cursor:
@@ -1949,12 +1981,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                                                 !newComment.trim()
                                                 ? "default"
                                                 : "pointer",
-                                        backgroundColor: "#111827",
+                                        background:
+                                            "linear-gradient(135deg,#1d4ed8,#2563eb)",
                                         color: "#ffffff",
                                         opacity:
                                             submittingComment ||
                                                 !newComment.trim()
-                                                ? 0.6
+                                                ? 0.7
                                                 : 1,
                                     }}
                                 >
@@ -1973,7 +2006,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                     style={{
                         position: "fixed",
                         inset: 0,
-                        backgroundColor: "rgba(0,0,0,0.35)",
+                        background:
+                            "radial-gradient(circle at top, rgba(37,99,235,0.25), transparent 55%), rgba(0,0,0,0.7)",
                         display: "flex",
                         justifyContent: "center",
                         alignItems: "center",
@@ -1985,13 +2019,16 @@ function ProjectsSection({ refreshKey = 0 }) {
                         style={{
                             width: "min(480px, 90vw)",
                             maxHeight: "70vh",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "10px",
+                            background:
+                                "linear-gradient(135deg, rgba(15,23,42,0.98), rgba(15,23,42,0.96))",
+                            borderRadius: "16px",
                             padding: "0.9rem",
-                            boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
+                            boxShadow: "0 24px 60px rgba(0,0,0,0.9)",
                             display: "flex",
                             flexDirection: "column",
                             gap: "0.5rem",
+                            border: "1px solid rgba(30,64,175,0.8)",
+                            color: "#e5e7eb",
                         }}
                     >
                         <div
@@ -2017,7 +2054,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     background: "transparent",
                                     cursor: "pointer",
                                     fontSize: "0.9rem",
-                                    color: "#6b7280",
+                                    color: "#9ca3af",
                                 }}
                             >
                                 ✕
@@ -2027,7 +2064,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                         <div
                             style={{
                                 fontSize: "0.8rem",
-                                color: "#6b7280",
+                                color: "#9ca3af",
                             }}
                         >
                             Recent actions in this project.
@@ -2070,7 +2107,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                             style={{
                                                 padding: "0.35rem 0",
                                                 borderBottom:
-                                                    "1px solid #e5e7eb",
+                                                    "1px solid rgba(31,41,55,0.9)",
                                                 fontSize: "0.82rem",
                                             }}
                                         >

@@ -1,5 +1,3 @@
-// frontend/src/pages/Dashboard.jsx
-
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import ProjectsSection from "../components/ProjectsSection";
@@ -14,94 +12,58 @@ function Dashboard() {
     };
 
     return (
-        <div
-            style={{
-                minHeight: "100vh",
-                backgroundColor: "#f3f4f6",
-                fontFamily: "system-ui",
-            }}
-        >
-            <header
-                style={{
-                    padding: "0.9rem 1.5rem",
-                    borderBottom: "1px solid #e5e7eb",
-                    backgroundColor: "#ffffff",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "1rem",
-                }}
-            >
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span
-                        style={{
-                            fontSize: "1.1rem",
-                            fontWeight: 600,
-                        }}
-                    >
-                        FlowSync
-                    </span>
-                    <span
-                        style={{
-                            fontSize: "0.8rem",
-                            color: "#6b7280",
-                        }}
-                    >
-                        Collaborative design feedback
-                    </span>
+        <div className="fs-app-shell">
+            <header className="fs-header">
+                <div className="fs-header-left">
+                    <div className="fs-logo-circle">F</div>
+                    <div>
+                        <div className="fs-header-title-main">FlowSync</div>
+                        <div className="fs-header-title-sub">
+                            Real-time collaboration workspace
+                        </div>
+                    </div>
                 </div>
 
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "1rem",
-                    }}
-                >
+                <div className="fs-header-right">
                     <InvitesBell onChanged={handleInvitesChanged} />
 
-                    <div
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-end",
-                        }}
-                    >
-                        <span
-                            style={{
-                                fontSize: "0.9rem",
-                                fontWeight: 500,
-                            }}
-                        >
+                    <div className="fs-header-user">
+                        <span className="fs-header-user-name">
                             {user?.display_name || user?.email || "User"}
                         </span>
-                        <span
-                            style={{
-                                fontSize: "0.75rem",
-                                color: "#6b7280",
-                            }}
-                        >
+                        <span className="fs-header-user-email">
                             {user?.email}
                         </span>
                     </div>
 
-                    <button
-                        onClick={logout}
-                        style={{
-                            padding: "0.35rem 0.8rem",
-                            borderRadius: "6px",
-                            border: "1px solid #e5e7eb",
-                            backgroundColor: "#f9fafb",
-                            fontSize: "0.8rem",
-                            cursor: "pointer",
-                        }}
-                    >
+                    <button onClick={logout} className="fs-button-ghost">
                         Log out
                     </button>
                 </div>
             </header>
 
-            <main style={{ padding: "1.5rem", maxWidth: "1100px", margin: "0 auto" }}>
+            <main className="fs-main-shell">
+                <section className="fs-hero">
+                    <div className="fs-hero-eyebrow">Design Collaboration Platform</div>
+                    <h1 className="fs-hero-title">Multiplayer feedback for your design files</h1>
+                    <p className="fs-hero-subtitle">
+                        Collaborate seamlessly with your team, manage projects efficiently, and streamline your design workflow. Upload files, collect comments, and keep everything in one shared space.
+                    </p>
+                    <div className="fs-hero-actions">
+                        <button className="fs-button-primary">
+                            ➕ Create New Project
+                        </button>
+                        <button className="fs-button-ghost" style={{ padding: '0.8rem 1.6rem' }}>
+                            📂 Jump to my projects
+                        </button>
+                    </div>
+                    <div style={{ marginTop: '1rem', display: 'flex', gap: '2rem', fontSize: '0.85rem', color: 'var(--fs-text-muted)' }}>
+                        <div>📁 <strong>0</strong> active projects</div>
+                        <div>🖼 <strong>0</strong> uploaded assets</div>
+                        <div>💬 <strong>0</strong> comments in view</div>
+                    </div>
+                </section>
+
                 <ProjectsSection refreshKey={projectsRefreshKey} />
             </main>
         </div>

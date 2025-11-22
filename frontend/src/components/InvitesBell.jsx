@@ -93,6 +93,7 @@ function InvitesBell({ onChanged }) {
 
             {open && (
                 <div
+                    className="fs-dropdown-card"
                     style={{
                         position: "absolute",
                         right: 0,
@@ -100,10 +101,6 @@ function InvitesBell({ onChanged }) {
                         width: "320px",
                         maxHeight: "360px",
                         overflowY: "auto",
-                        backgroundColor: "#fff",
-                        borderRadius: "8px",
-                        border: "1px solid #e5e7eb",
-                        boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
                         zIndex: 50,
                     }}
                 >

@@ -12,7 +12,6 @@ function AuthCallback() {
         const token = params.get("token");
 
         if (!token) {
-            // No token → something went wrong
             navigate("/", { replace: true });
             return;
         }

@@ -1,5 +1,3 @@
-// frontend/src/context/AuthContext.jsx
-
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../api/client";
 
@@ -10,7 +8,6 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Load token from localStorage on first mount
     useEffect(() => {
         const stored = localStorage.getItem("flowsync_token");
         if (!stored) {
@@ -30,7 +27,6 @@ export function AuthProvider({ children }) {
         }
 
         try {
-            // /auth/me currently expects ?token=...
             const res = await api.get("/auth/me", {
                 params: { token: jwt },
             });
