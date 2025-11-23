@@ -56,6 +56,7 @@ function Dashboard() {
 
                 <main className="fs-main-shell">
                     <section className="fs-hero">
+
                         <div className="fs-hero-eyebrow">Design Collaboration Platform</div>
                         <h1 className="fs-hero-title">Multiplayer feedback for your design files or documents</h1>
                         <p className="fs-hero-subtitle">
@@ -71,6 +72,7 @@ function Dashboard() {
                             <div>🖼 <strong>0</strong> uploaded assets</div>
                             <div>💬 <strong>0</strong> comments in view</div>
                         </div>
+
                     </section>
 
                     <ProjectsSection refreshKey={projectsRefreshKey} />

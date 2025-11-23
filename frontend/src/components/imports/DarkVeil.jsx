@@ -76,7 +76,7 @@ void main(){
 `;
 
 function DarkVeilInner({
-    hueShift = 30,
+    hueShift = 35,
     noiseIntensity = 0,
     scanlineIntensity = 0,
     speed = 0.8,

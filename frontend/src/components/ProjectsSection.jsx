@@ -980,7 +980,6 @@ function ProjectsSection({ refreshKey = 0 }) {
                 )}
 
                 {/* Deadline row */}
-
                 <div
                     style={{
                         marginTop: "0.25rem",
@@ -1385,79 +1384,78 @@ function ProjectsSection({ refreshKey = 0 }) {
             <h2 style={{ marginBottom: "0.75rem" }}>Projects</h2>
 
             {/* Create project form */}
-            <div className="holographic-card">
-                <form
-                    onSubmit={handleCreate}
-                    className="fs-create-card"
+            <form
+                onSubmit={handleCreate}
+                className="fs-create-card"
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.6rem",
+                    marginBottom: "1.8rem",
+                }}
+            >
+                <input
+                    type="text"
+                    placeholder="Project name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="fs-input"
+                    required
+                />
+                <textarea
+                    placeholder="Short description (optional)"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
+                    className="fs-textarea"
+                />
+                <div
                     style={{
                         display: "flex",
-                        flexDirection: "column",
-                        gap: "0.6rem",
-                        marginBottom: "1.8rem",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        flexWrap: "wrap",
+                        fontSize: "0.85rem",
+                        color: "#cbd5f5",
                     }}
                 >
+                    <label
+                        style={{
+                            fontSize: "0.8rem",
+                            color: "#bfdbfe",
+                        }}
+                    >
+                        Deadline:
+                    </label>
                     <input
-                        type="text"
-                        placeholder="Project name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="fs-input"
-                        required
+                        type="date"
+                        value={newDeadline}
+                        onChange={(e) => setNewDeadline(e.target.value)}
+                        className="fs-date"
                     />
-                    <textarea
-                        placeholder="Short description (optional)"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={2}
-                        className="fs-textarea"
-                    />
-                    <div
+                    <span
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                            flexWrap: "wrap",
-                            fontSize: "0.85rem",
-                            color: "#cbd5f5",
+                            fontSize: "0.75rem",
+                            color: "#6b7280",
                         }}
                     >
-                        <label
-                            style={{
-                                fontSize: "0.8rem",
-                                color: "#bfdbfe",
-                            }}
-                        >
-                            Deadline:
-                        </label>
-                        <input
-                            type="date"
-                            value={newDeadline}
-                            onChange={(e) => setNewDeadline(e.target.value)}
-                            className="fs-date"
-                        />
-                        <span
-                            style={{
-                                fontSize: "0.75rem",
-                                color: "#6b7280",
-                            }}
-                        >
-                            (optional)
-                        </span>
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={creating}
-                        className="fs-primary-button"
-                        style={{
-                            alignSelf: "flex-start",
-                            opacity: creating ? 0.8 : 1,
-                            cursor: creating ? "default" : "pointer",
-                        }}
-                    >
-                        {creating ? "Creating..." : "Create project"}
-                    </button>
-                </form>
-            </div>
+                        (optional)
+                    </span>
+                </div>
+                <button
+                    type="submit"
+                    disabled={creating}
+                    className="fs-primary-button"
+                    style={{
+                        alignSelf: "flex-start",
+                        opacity: creating ? 0.8 : 1,
+                        cursor: creating ? "default" : "pointer",
+                    }}
+                >
+                    {creating ? "Creating..." : "Create project"}
+                </button>
+            </form>
+
             {/* Owned projects */}
 
             <div id="fs-my-projects-section" style={{ marginBottom: "1.5rem" }}>
@@ -1695,6 +1693,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                             style={{
                                 height: "100%",
                                 minHeight: 0,
+                                overflow: "hidden",
                                 borderRadius: "10px",
                                 overflow: "auto",
                                 border:
@@ -1704,7 +1703,6 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 justifyContent: "center",
                                 background:
                                     "radial-gradient(circle at top left, rgba(30,64,175,0.22), transparent 55%), #020617",
-
                             }}
                         >
                             {activeFileInfo &&
@@ -2012,7 +2010,6 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     padding: "0.4rem",
                                     fontSize: "0.85rem",
                                     backgroundColor: "rgba(15,23,42,0.9)",
-
                                 }}
                             >
                                 {loadingComments ? (

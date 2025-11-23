@@ -477,8 +477,8 @@ body {
   gap: 0.4rem;
 }
 .fs-project-card:hover{
-  transform: scale(1.02) ;
-  box-shadow: 0.8rem 0.8rem 20px rgba(17, 39, 234, 0.44);
+  transform: scale(1.01) ;
+  box-shadow: 0.5rem 0.5rem 20px rgba(17, 39, 234, 0.44);
   transition:
     background-color 0.5s ease,
     border-color 0.5s ease,
@@ -652,3 +652,6 @@ body {
     font-size: 0.75rem;
   }
 }
+
+
+
