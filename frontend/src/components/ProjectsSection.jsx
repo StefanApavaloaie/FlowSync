@@ -61,6 +61,34 @@ function getFileInfo(asset) {
 
     return { ext, name, kind, icon, label };
 }
+function sortProjectsBy(projects, sortOption) {
+    const safeCreated = (p) => {
+        if (!p.created_at) return 0;
+        const t = new Date(p.created_at).getTime();
+        return Number.isNaN(t) ? 0 : t;
+    };
+
+    const safeDeadline = (p) => {
+        if (!p.deadline) return Number.POSITIVE_INFINITY;
+        const t = new Date(p.deadline).getTime();
+        return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+    };
+
+    const copy = [...projects];
+
+    if (sortOption === "oldest") {
+        // oldest created first
+        copy.sort((a, b) => safeCreated(a) - safeCreated(b));
+    } else if (sortOption === "deadline") {
+        // earliest deadline first, “no deadline” goes last
+        copy.sort((a, b) => safeDeadline(a) - safeDeadline(b));
+    } else {
+        // default: newest created first
+        copy.sort((a, b) => safeCreated(b) - safeCreated(a));
+    }
+
+    return copy;
+}
 
 function ProjectsSection({ refreshKey = 0 }) {
     const { token, user } = useAuth();
@@ -96,6 +124,7 @@ function ProjectsSection({ refreshKey = 0 }) {
     const [activityProject, setActivityProject] = useState(null);
     const [activityItems, setActivityItems] = useState([]);
     const [loadingActivity, setLoadingActivity] = useState(false);
+    const [sortOwnedBy, setSortOwnedBy] = useState("newest"); // "newest" | "oldest" | "deadline"
 
     // ---- helpers for project state updates ----
 
@@ -1322,6 +1351,8 @@ function ProjectsSection({ refreshKey = 0 }) {
     const hasOwned = ownedProjects.length > 0;
     const hasShared = sharedProjects.length > 0;
     const hasArchived = archivedProjects.length > 0;
+    const sortedOwnedProjects = sortProjectsBy(ownedProjects, sortOwnedBy);
+
 
     const isOwnerOfActiveAssetProject =
         activeAsset &&
@@ -1426,16 +1457,114 @@ function ProjectsSection({ refreshKey = 0 }) {
             </form>
 
             {/* Owned projects */}
+
             <div id="fs-my-projects-section" style={{ marginBottom: "1.5rem" }}>
-                <h3
+                <div
                     style={{
                         marginBottom: "0.5rem",
-                        fontSize: "0.95rem",
-                        color: "#f9fafb",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.75rem",
                     }}
                 >
-                    My projects
-                </h3>
+                    <h3
+                        style={{
+                            margin: 0,
+                            fontSize: "0.95rem",
+                            color: "#f9fafb",
+                        }}
+                    >
+                        My projects
+                    </h3>
+
+                    {hasOwned && (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.4rem",
+                                fontSize: "0.8rem",
+                                color: "#9ca3af",
+                            }}
+                        >
+                            <span>Sort by:</span>
+                            <button
+                                type="button"
+                                onClick={() => setSortOwnedBy("newest")}
+                                style={{
+                                    padding: "0.18rem 0.6rem",
+                                    borderRadius: "999px",
+                                    border:
+                                        sortOwnedBy === "newest"
+                                            ? "1px solid rgba(96,165,250,0.9)"
+                                            : "1px solid rgba(30,64,175,0.7)",
+                                    background:
+                                        sortOwnedBy === "newest"
+                                            ? "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                                            : "rgba(15,23,42,0.9)",
+                                    color:
+                                        sortOwnedBy === "newest"
+                                            ? "#f9fafb"
+                                            : "#9ca3af",
+                                    cursor: "pointer",
+                                    fontSize: "0.78rem",
+                                }}
+                            >
+                                Newest
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSortOwnedBy("oldest")}
+                                style={{
+                                    padding: "0.18rem 0.6rem",
+                                    borderRadius: "999px",
+                                    border:
+                                        sortOwnedBy === "oldest"
+                                            ? "1px solid rgba(96,165,250,0.9)"
+                                            : "1px solid rgba(30,64,175,0.7)",
+                                    background:
+                                        sortOwnedBy === "oldest"
+                                            ? "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                                            : "rgba(15,23,42,0.9)",
+                                    color:
+                                        sortOwnedBy === "oldest"
+                                            ? "#f9fafb"
+                                            : "#9ca3af",
+                                    cursor: "pointer",
+                                    fontSize: "0.78rem",
+                                }}
+                            >
+                                Oldest
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSortOwnedBy("deadline")}
+                                style={{
+                                    padding: "0.18rem 0.6rem",
+                                    borderRadius: "999px",
+                                    border:
+                                        sortOwnedBy === "deadline"
+                                            ? "1px solid rgba(96,165,250,0.9)"
+                                            : "1px solid rgba(30,64,175,0.7)",
+                                    background:
+                                        sortOwnedBy === "deadline"
+                                            ? "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                                            : "rgba(15,23,42,0.9)",
+                                    color:
+                                        sortOwnedBy === "deadline"
+                                            ? "#f9fafb"
+                                            : "#9ca3af",
+                                    cursor: "pointer",
+                                    fontSize: "0.78rem",
+                                }}
+                            >
+                                Deadline
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 {!hasOwned ? (
                     <div className="fs-empty-card">
                         You have no projects yet. Create one to start
@@ -1450,12 +1579,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                             gap: "0.9rem",
                         }}
                     >
-                        {ownedProjects.map((project) =>
+                        {sortedOwnedProjects.map((project) =>
                             renderProjectCard(project, { isOwned: true })
                         )}
                     </div>
                 )}
             </div>
+
 
             {/* Archived projects */}
             <div style={{ marginBottom: "1.5rem" }}>
