@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import ProjectActionsMenu from "./ProjectsActionMenu";
 
 // emojis we support
 const REACTION_EMOJIS = ["👍", "❤️", "💡", "😂", "😮"];
@@ -1011,7 +1012,9 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     )
                                 }
                                 className="fs-date"
-                                style={{ fontSize: "0.78rem" }}
+                                style={{
+                                    fontSize: "0.78rem",
+                                }}
                             />
                             {!project.deadline && (
                                 <span
@@ -1040,13 +1043,13 @@ function ProjectsSection({ refreshKey = 0 }) {
                         flexWrap: "wrap",
                     }}
                 >
+                    {/* Upload stays as a normal button */}
                     <label
                         style={{
                             fontSize: "0.78rem",
                             padding: "0.25rem 0.8rem",
                             borderRadius: "999px",
-                            border:
-                                "1px solid rgba(96,165,250,0.6)",
+                            border: "1px solid rgba(96,165,250,0.6)",
                             cursor:
                                 uploadingFor === project.id || archived
                                     ? "default"
@@ -1060,9 +1063,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                     : 1,
                         }}
                     >
-                        {uploadingFor === project.id
-                            ? "Uploading..."
-                            : "Upload asset"}
+                        {uploadingFor === project.id ? "Uploading..." : "Upload asset"}
                         <input
                             type="file"
                             accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
@@ -1072,77 +1073,25 @@ function ProjectsSection({ refreshKey = 0 }) {
                         />
                     </label>
 
-                    <button
-                        onClick={() => loadAssets(project.id)}
-                        style={{
-                            padding: "0.25rem 0.8rem",
-                            fontSize: "0.78rem",
-                            borderRadius: "999px",
-                            border:
-                                "1px solid rgba(148,163,184,0.5)",
-                            background:
-                                "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
-                            cursor: "pointer",
-                            color: "#e5e7eb",
-                        }}
-                    >
-                        Refresh assets
-                    </button>
-
+                    {/* 🔽 Options dropdown for owned projects */}
                     {isOwned && (
-                        <>
-                            <button
-                                onClick={() => handleRenameProject(project)}
-                                style={{
-                                    padding: "0.25rem 0.8rem",
-                                    fontSize: "0.78rem",
-                                    borderRadius: "999px",
-                                    border:
-                                        "1px solid rgba(148,163,184,0.5)",
-                                    background:
-                                        "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
-                                    cursor: "pointer",
-                                    color: "#e5e7eb",
-                                }}
-                            >
-                                Rename
-                            </button>
-
-                            <button
-                                onClick={() =>
-                                    handleArchiveToggle(project, !archived)
+                        <ProjectActionsMenu
+                            archived={archived}
+                            onUploadAsset={() => {
+                                const parent = document.activeElement?.closest(
+                                    ".fs-project-card"
+                                );
+                                if (!parent) return;
+                                const input = parent.querySelector("input[type='file']");
+                                if (input && !archived && uploadingFor !== project.id) {
+                                    input.click();
                                 }
-                                style={{
-                                    padding: "0.25rem 0.8rem",
-                                    fontSize: "0.78rem",
-                                    borderRadius: "999px",
-                                    border:
-                                        "1px solid rgba(148,163,184,0.5)",
-                                    background:
-                                        "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8))",
-                                    cursor: "pointer",
-                                    color: "#e5e7eb",
-                                }}
-                            >
-                                {archived ? "Unarchive" : "Archive"}
-                            </button>
-
-                            <button
-                                onClick={() => handleDeleteProject(project.id)}
-                                style={{
-                                    padding: "0.25rem 0.8rem",
-                                    fontSize: "0.78rem",
-                                    borderRadius: "999px",
-                                    border:
-                                        "1px solid rgba(248,113,113,0.8)",
-                                    backgroundColor: "rgba(127,29,29,0.35)",
-                                    cursor: "pointer",
-                                    color: "#fecaca",
-                                }}
-                            >
-                                Delete
-                            </button>
-                        </>
+                            }}
+                            onRefreshAssets={() => loadAssets(project.id)}
+                            onRename={() => handleRenameProject(project)}
+                            onArchive={() => handleArchiveToggle(project, !archived)}
+                            onDelete={() => handleDeleteProject(project.id)}
+                        />
                     )}
 
                     {isShared && (
@@ -1152,8 +1101,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 padding: "0.25rem 0.8rem",
                                 fontSize: "0.78rem",
                                 borderRadius: "999px",
-                                border:
-                                    "1px solid rgba(248,153,72,0.8)",
+                                border: "1px solid rgba(248,153,72,0.8)",
                                 backgroundColor: "rgba(120,53,15,0.5)",
                                 color: "#fed7aa",
                                 cursor: "pointer",
@@ -1812,7 +1760,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         alignItems: "center",
                                     }}
                                 >
-                                    <button
+                                    {/* <button
                                         onClick={handleAiButtonClick}
                                         disabled={loadingAi}
                                         style={{
@@ -1839,7 +1787,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                                     ? "Hide AI Suggestions"
                                                     : "Show AI Suggestions"
                                                 : "AI Suggestions"}
-                                    </button>
+                                    </button> */}
 
                                     {isOwnerOfActiveAssetProject && (
                                         <button
@@ -1948,7 +1896,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                 </div>
                             )}
 
-                            {/* AI suggestions panel */}
+                            {/* AI suggestions panel
                             {aiSuggestions && showAi && (
                                 <div
                                     style={{
@@ -1995,7 +1943,7 @@ function ProjectsSection({ refreshKey = 0 }) {
                                         )}
                                     </ul>
                                 </div>
-                            )}
+                            )} */}
 
                             {/* Comments list */}
                             <div

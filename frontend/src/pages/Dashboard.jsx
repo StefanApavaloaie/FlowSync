@@ -1,16 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import ProjectsSection from "../components/ProjectsSection";
 import InvitesBell from "../components/InvitesBell";
 import DarkVeil from "../components/imports/DarkVeil";
-
+import { useNavigate } from "react-router-dom";
 function Dashboard() {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
+
+    // 👇 treat "logged in" as: has display_name or email
+    const isLoggedIn = !!(user?.display_name || user?.email);
+
+    // modal state
+    const [showLoginModal, setShowLoginModal] = useState(!isLoggedIn);
+
+    useEffect(() => {
+        // whenever user changes, update modal
+        setShowLoginModal(!isLoggedIn);
+    }, [isLoggedIn]);
 
     const handleInvitesChanged = () => {
         setProjectsRefreshKey((prev) => prev + 1);
     };
+
     const scrollToMyProjects = () => {
         const el = document.getElementById("fs-my-projects-section");
         if (el) {
@@ -20,9 +33,41 @@ function Dashboard() {
             });
         }
     };
+
     return (
         <>
             <DarkVeil />
+
+            {/* 🔔 login modal when user is not logged in */}
+            {showLoginModal && (
+                <div className="fs-modal-backdrop">
+                    <div className="fs-modal">
+                        <h2>You are not logged in</h2>
+                        <p>Log in to see your projects 😊</p>
+
+                        <div className="fs-modal-actions">
+                            <button
+                                className="fs-modal-primary"
+                                onClick={() => {
+                                    logout();
+                                    navigate("/");
+                                }
+                                }
+                            >
+                                Go to login
+                            </button>
+
+                            <button
+                                className="fs-modal-secondary"
+                                onClick={() => setShowLoginModal(false)}
+                            >
+                                Maybe later
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             <div className="fs-app-shell">
                 <header className="fs-header">
@@ -48,31 +93,52 @@ function Dashboard() {
                             </span>
                         </div>
 
-                        <button onClick={logout} className="fs-button-ghost">
-                            Log out
-                        </button>
+                        {/* only show Log out when we actually have a user */}
+                        {isLoggedIn && (
+                            <button
+                                onClick={logout}
+                                className="fs-button-ghost"
+                            >
+                                Log out
+                            </button>
+                        )}
                     </div>
                 </header>
 
                 <main className="fs-main-shell">
                     <section className="fs-hero">
-
-                        <div className="fs-hero-eyebrow">Design Collaboration Platform</div>
-                        <h1 className="fs-hero-title">Multiplayer feedback for your design files or documents</h1>
+                        <div className="fs-hero-eyebrow">
+                            Design Collaboration Platform
+                        </div>
+                        <h1 className="fs-hero-title">
+                            Multiplayer feedback for your design files or
+                            documents
+                        </h1>
                         <p className="fs-hero-subtitle">
-                            Collaborate seamlessly with your team, manage projects efficiently, and streamline your design workflow. Upload files, collect comments, and keep everything in one shared space.
+                            Collaborate seamlessly with your team, manage
+                            projects efficiently, and streamline your design
+                            workflow. Upload files, collect comments, and keep
+                            everything in one shared space.
                         </p>
                         <div className="fs-hero-actions">
-                            <button className="fs-button-ghost" style={{ padding: '0.8rem 1.6rem' }} onClick={scrollToMyProjects}>
+                            <button
+                                className="fs-button-ghost"
+                                style={{ padding: "0.8rem 1.6rem" }}
+                                onClick={scrollToMyProjects}
+                            >
                                 📂 Jump to my projects
                             </button>
                         </div>
-                        <div style={{ marginTop: '1rem', display: 'flex', gap: '2rem', fontSize: '0.85rem', color: 'var(--fs-text-muted)' }}>
-                            <div>📁 <strong>0</strong> active projects</div>
-                            <div>🖼 <strong>0</strong> uploaded assets</div>
-                            <div>💬 <strong>0</strong> comments in view</div>
+                        <div
+                            style={{
+                                marginTop: "1rem",
+                                display: "flex",
+                                gap: "2rem",
+                                fontSize: "0.85rem",
+                                color: "var(--fs-text-muted)",
+                            }}
+                        >
                         </div>
-
                     </section>
 
                     <ProjectsSection refreshKey={projectsRefreshKey} />
@@ -81,6 +147,5 @@ function Dashboard() {
         </>
     );
 }
-
 
 export default Dashboard;

@@ -57,141 +57,67 @@ function InvitesBell({ onChanged }) {
     const count = invites.length;
 
     return (
-        <div style={{ position: "relative" }}>
+        <div className="fs-invites-wrapper">
+            {/* bell button */}
             <button
                 type="button"
+                className="fs-bell-button"
                 onClick={() => setOpen((prev) => !prev)}
-                style={{
-                    position: "relative",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    padding: "0.25rem",
-                }}
             >
-                <span style={{ fontSize: "1.3rem" }}>🔔</span>
+                <span className="fs-bell-icon">🔔</span>
                 {count > 0 && (
-                    <span
-                        style={{
-                            position: "absolute",
-                            top: 0,
-                            right: 0,
-                            transform: "translate(50%, -50%)",
-                            backgroundColor: "#ef4444",
-                            color: "#fff",
-                            borderRadius: "999px",
-                            padding: "0 0.35rem",
-                            fontSize: "0.7rem",
-                            minWidth: "1.1rem",
-                            textAlign: "center",
-                        }}
-                    >
+                    <span className="fs-bell-badge">
                         {count}
                     </span>
                 )}
             </button>
 
+            {/* dropdown */}
             {open && (
-                <div
-                    className="fs-dropdown-card"
-                    style={{
-                        position: "absolute",
-                        right: 0,
-                        marginTop: "0.5rem",
-                        width: "320px",
-                        maxHeight: "360px",
-                        overflowY: "auto",
-                        zIndex: 50,
-                    }}
-                >
-                    <div
-                        style={{
-                            padding: "0.6rem 0.8rem",
-                            borderBottom: "1px solid #e5e7eb",
-                            fontWeight: 600,
-                            fontSize: "0.9rem",
-                        }}
-                    >
-                        Invites
+                <div className="fs-dropdown-card fs-invites-dropdown">
+                    <div className="fs-invites-header">
+                        <span>Invites</span>
+                        {count > 0 && (
+                            <span className="fs-invites-count">
+                                {count} pending
+                            </span>
+                        )}
                     </div>
 
                     {loading ? (
-                        <div
-                            style={{
-                                padding: "0.8rem",
-                                fontSize: "0.85rem",
-                                color: "#6b7280",
-                            }}
-                        >
+                        <div className="fs-invites-empty">
                             Loading...
                         </div>
                     ) : invites.length === 0 ? (
-                        <div
-                            style={{
-                                padding: "0.8rem",
-                                fontSize: "0.85rem",
-                                color: "#6b7280",
-                            }}
-                        >
+                        <div className="fs-invites-empty">
                             No pending invites.
                         </div>
                     ) : (
                         invites.map((inv) => (
-                            <div
-                                key={inv.id}
-                                style={{
-                                    padding: "0.7rem 0.8rem",
-                                    borderBottom: "1px solid #f3f4f6",
-                                    fontSize: "0.85rem",
-                                }}
-                            >
-                                <div style={{ fontWeight: 500 }}>
-                                    {inv.project?.name || "Project"}
+                            <div key={inv.id} className="fs-invite-item">
+                                <div className="fs-invite-main">
+                                    <div className="fs-invite-project">
+                                        {inv.project?.name || "Project"}
+                                    </div>
+                                    <div className="fs-invite-meta">
+                                        Invited by{" "}
+                                        {inv.invited_by?.display_name ||
+                                            inv.invited_by?.email ||
+                                            "unknown"}
+                                    </div>
                                 </div>
-                                <div
-                                    style={{
-                                        color: "#6b7280",
-                                        fontSize: "0.8rem",
-                                        marginTop: "0.15rem",
-                                    }}
-                                >
-                                    Invited by{" "}
-                                    {inv.invited_by?.display_name ||
-                                        inv.invited_by?.email ||
-                                        "unknown"}
-                                </div>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "flex-end",
-                                        gap: "0.35rem",
-                                        marginTop: "0.45rem",
-                                    }}
-                                >
+                                <div className="fs-invite-actions">
                                     <button
+                                        type="button"
+                                        className="fs-invite-btn fs-invite-decline"
                                         onClick={() => handleDecline(inv.id)}
-                                        style={{
-                                            borderRadius: "4px",
-                                            border: "1px solid #e5e7eb",
-                                            backgroundColor: "#f9fafb",
-                                            padding: "0.25rem 0.55rem",
-                                            fontSize: "0.8rem",
-                                            cursor: "pointer",
-                                        }}
                                     >
                                         Decline
                                     </button>
                                     <button
+                                        type="button"
+                                        className="fs-invite-btn fs-invite-accept"
                                         onClick={() => handleAccept(inv.id)}
-                                        style={{
-                                            borderRadius: "4px",
-                                            border: "none",
-                                            backgroundColor: "#111827",
-                                            color: "#fff",
-                                            padding: "0.25rem 0.7rem",
-                                            fontSize: "0.8rem",
-                                            cursor: "pointer",
-                                        }}
                                     >
                                         Accept
                                     </button>

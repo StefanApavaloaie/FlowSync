@@ -586,7 +586,9 @@ body {
   .fs-hero {
     padding: 1.4rem 1.4rem 1.8rem;
   }
-
+  .fs-header-title-main, .fs-header-title-sub{
+    display: none
+  }
   .fs-hero-title {
     font-size: 1.6rem;
     line-height: 1.2;
@@ -600,14 +602,13 @@ body {
 
   /* ===== HEADER MOBILE LAYOUT ===== */
 
-  .fs-header {
+  /* .fs-header {
     padding: 0.75rem 1.2rem;
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
   }
 
-  /* Row 1: logo + app name/tagline */
   .fs-header-left {
     width: 100%;
     display: flex;
@@ -622,10 +623,9 @@ body {
 
   .fs-header-title-sub {
     font-size: 0.7rem;
-    max-width: 10.5rem; /* stops it from wrapping into 3 lines */
+    max-width: 10.5rem; 
   }
 
-  /* Row 2: bell + user + logout */
   .fs-header-right {
     width: 100%;
     display: flex;
@@ -650,8 +650,299 @@ body {
   .fs-button-ghost {
     padding: 0.35rem 0.8rem;
     font-size: 0.75rem;
-  }
+  } */
 }
 
 
 
+
+/* PROJECTMENU  */
+/* ---------- Login modal ---------- */
+
+.fs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* above header / content */
+}
+
+.fs-modal {
+  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.15), transparent 55%),
+              rgba(15, 23, 42, 0.97);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 1.8rem 2.2rem;
+  width: min(420px, 90vw);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+  text-align: center;
+  color: #f9fafb;
+  border: 1px solid rgba(59, 130, 246, 0.7);
+}
+
+.fs-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.fs-modal p {
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.fs-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+.fs-modal-primary,
+.fs-modal-secondary {
+  border-radius: 999px;
+  padding: 0.45rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.fs-modal-primary {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: #ffffff;
+}
+.fs-modal-primary:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 18px 50px rgba(37, 99, 235, 0.9);
+}
+
+.fs-modal-secondary {
+  background: transparent;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+}
+.fs-modal-secondary:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+
+.fs-project-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.fs-project-menu-trigger {
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.fs-project-menu-dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 0.4rem;
+  min-width: 190px;
+  background: rgba(15, 23, 42, 0.97);
+  backdrop-filter: blur(14px);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  padding: 0.35rem 0;
+  z-index: 40;
+}
+
+.fs-project-menu-dropdown button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.fs-project-menu-dropdown button:nth-child(-n+2){
+  color: #fff
+}
+
+.fs-project-menu-dropdown button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fs-project-menu-danger {
+  color: #ff6b6b;
+}
+
+
+/* ---------- Invites bell ---------- */
+
+.fs-invites-wrapper {
+  position: relative;
+}
+
+.fs-bell-button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: radial-gradient(circle at 20% 0, rgba(56, 189, 248, 0.28), transparent 55%),
+              rgba(15, 23, 42, 0.98);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.9);
+}
+
+.fs-bell-button:hover {
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.55);
+  border-color: rgba(96, 165, 250, 0.8);
+}
+
+.fs-bell-icon {
+  font-size: 1.1rem;
+}
+
+.fs-bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  min-width: 1.1rem;
+  text-align: center;
+  border: 2px solid #020617;
+}
+
+/* ---------- Invites dropdown (solid, not super transparent) ---------- */
+
+.fs-dropdown-card.fs-invites-dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 0.75rem;
+  width: 340px;
+  max-height: 360px;
+  overflow-y: auto;
+  z-index: 60;
+
+  background: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.99),
+      rgba(15, 23, 42, 0.97)
+  );
+  border-radius: 18px;
+  border: 1px solid rgba(30, 64, 175, 0.8);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.85);
+  color: #e5e7eb;
+}
+
+.fs-invites-header {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(30, 64, 175, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.fs-invites-count {
+  font-size: 0.75rem;
+  color: #93c5fd;
+}
+
+.fs-invites-empty {
+  padding: 0.9rem 1rem;
+  font-size: 0.83rem;
+  color: #9ca3af;
+}
+
+.fs-invite-item {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.83rem;
+}
+
+.fs-invite-project {
+  font-weight: 500;
+  color: #f9fafb;
+}
+
+.fs-invite-meta {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.fs-invite-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.fs-invite-btn {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  border: none;
+}
+
+.fs-invite-decline, .fs-invite-accept {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  color: #e5e7eb;
+}
+
+.fs-invite-decline:hover {
+  background: rgba(15, 23, 42, 0.85);
+}
+
+
+
+.fs-invite-accept:hover {
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6);
+}
+/* subtle shake on hover */
+.fs-bell-button:hover {
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.55);
+  border-color: rgba(96, 165, 250, 0.8);
+  animation: fs-bell-shake 0.4s ease-in-out;
+}
+
+/* keyframes for the shake */
+@keyframes fs-bell-shake {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-10deg); }
+  40%  { transform: rotate(8deg); }
+  60%  { transform: rotate(-6deg); }
+  80%  { transform: rotate(4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+
+@media (max-width: 640px) {
+  .fs-dropdown-card.fs-invites-dropdown {
+    position: fixed;                          /* detach from header wrapper */
+    top: 70px;                                /* just below the header */
+    right: 1rem;                              /* stick to screen right */
+    left: auto;
+    margin-top: 0;                            /* no extra gap */
+    width: min(320px, calc(100% - 2rem));     /* fit nicely on small screens */
+    max-height: 60vh;                         /* avoid covering whole screen */
+  }
+}
