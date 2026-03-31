@@ -261,7 +261,7 @@ export default function AssetViewerModal({
                 >
                     {activeFileInfo && activeFileInfo.kind === "image" ? (
                         <img
-                            src={activeAsset.file_path.startsWith('http') ? activeAsset.file_path : `http://localhost:8000/uploads/${activeAsset.file_path}`}
+                            src={activeAsset.file_path.startsWith('http') ? activeAsset.file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/uploads/${activeAsset.file_path}`}
                             alt={`Asset ${activeAsset.id}`}
                             style={{
                                 maxWidth: "100%",
@@ -307,7 +307,7 @@ export default function AssetViewerModal({
                                 {activeFileInfo?.label || "File"}
                             </div>
                             <a
-                                href={activeAsset.file_path.startsWith('http') ? activeAsset.file_path : `http://localhost:8000/uploads/${activeAsset.file_path}`}
+                                href={activeAsset.file_path.startsWith('http') ? activeAsset.file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/uploads/${activeAsset.file_path}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 style={{

@@ -314,7 +314,7 @@ export default function ProjectCard({
                                 {isImage ? (
                                     <img
                                         // Need to use env var or relative path ideally, but keeping as is for safety
-                                        src={asset.file_path.startsWith('http') ? asset.file_path : `http://localhost:8000/uploads/${asset.file_path}`}
+                                        src={asset.file_path.startsWith('http') ? asset.file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/uploads/${asset.file_path}`}
                                         alt={`Asset ${asset.id}`}
                                         onClick={() =>
                                             onOpenAssetViewer(asset)
