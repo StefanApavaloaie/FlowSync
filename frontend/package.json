@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^10.47.0",
     "axios": "^1.6.0",
     "gsap": "^3.13.0",
     "ogl": "^1.0.11",

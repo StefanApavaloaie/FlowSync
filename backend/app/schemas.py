@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import ClassVar
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # ---------- USERS ----------
@@ -20,15 +21,17 @@ class UserOut(BaseModel):
 
 
 class ProjectCreate(BaseModel):
-    name: str
-    description: str | None = None
-    deadline: str |None = None
+    name: str = Field(..., max_length=100)
+    description: str | None = Field(None, max_length=2000)
+    deadline: str | None = None
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 class ProjectUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(None, max_length=100)
+    description: str | None = Field(None, max_length=2000)
     is_archived: bool | None = None
-    deadline: str |None = None
+    deadline: str | None = None
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 class ProjectOut(BaseModel):
     id: int
@@ -38,7 +41,7 @@ class ProjectOut(BaseModel):
     is_archived: bool
     deadline: str | None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # ---------- PARTICIPANTS ----------
@@ -68,7 +71,7 @@ class AssetOut(BaseModel):
     status: str 
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AssetStatusUpdate(BaseModel):
     status: str
@@ -76,8 +79,9 @@ class AssetStatusUpdate(BaseModel):
 
 
 class CommentCreate(BaseModel):
-    content: str
+    content: str = Field(..., max_length=3000)
     parent_id: int | None = None
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 class CommentReactionCreate(BaseModel):
     emoji: str

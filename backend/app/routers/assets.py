@@ -8,8 +8,15 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
+import cloudinary
+import cloudinary.uploader
+
 from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
+from ..config import settings
+
+if settings.CLOUDINARY_URL:
+    cloudinary.config(url=settings.CLOUDINARY_URL)
 
 router = APIRouter(prefix="/projects", tags=["assets"])
 
@@ -116,19 +123,35 @@ async def upload_asset(
             ),
         )
 
-    # Build filename – keep original extension when it's allowed
+    # Build filename base
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     original_name = file.filename or "asset"
     original_ext = os.path.splitext(original_name)[1].lower()
     ext = original_ext if original_ext in ALLOWED_EXTENSIONS else ""
 
     filename = f"project_{project.id}_{timestamp}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
 
-    # Save file
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+    if settings.CLOUDINARY_URL:
+        # Upload to Cloudinary
+        try:
+            upload_result = cloudinary.uploader.upload(
+                file.file,
+                resource_type="auto",
+                public_id=f"flowsync_project_{project.id}_{timestamp}"
+            )
+            file_path = upload_result.get("secure_url")
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to upload to Cloudinary: {str(e)}"
+            )
+    else:
+        # Fallback to local upload
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        # For local, save the relative filename
+        file_path = filename
 
     # Compute version number
     current_count = (
@@ -140,7 +163,7 @@ async def upload_asset(
     asset = models.Asset(
         project_id=project.id,
         user_id=current_user.id,
-        file_path=filename,  # relative filename
+        file_path=file_path,  # secure_url or local filename
         version=current_count + 1,
     )
 
@@ -235,13 +258,22 @@ def delete_asset(
 
     # Delete associated file if it exists
     if asset.file_path:
-        disk_path = os.path.join(UPLOAD_DIR, asset.file_path)
-        if os.path.exists(disk_path):
+        if asset.file_path.startswith("http"):
+            # It's a Cloudinary URL, we can attempt to delete it by reverse-engineering public_id
+            # e.g., https://.../v12345/flowsync_project_1_timestamp.png
             try:
-                os.remove(disk_path)
-            except OSError:
-                # ignore file delete errors
+                public_id = asset.file_path.split("/")[-1].split(".")[0]
+                cloudinary.uploader.destroy(public_id)
+            except Exception:
                 pass
+        else:
+            # Local file
+            disk_path = os.path.join(UPLOAD_DIR, asset.file_path)
+            if os.path.exists(disk_path):
+                try:
+                    os.remove(disk_path)
+                except OSError:
+                    pass
 
     db.delete(asset)
     db.commit()
