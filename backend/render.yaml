@@ -2,8 +2,11 @@ services:
   - type: web
     name: flowsync-api
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    plan: free # Strictly ensures you stay on the free tier
+    # Added 'backend/' to the path so Render finds your file
+    buildCommand: "pip install -r backend/requirements.txt" 
+    # Added 'cd backend &&' so uvicorn runs from the correct folder
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
