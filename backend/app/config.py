@@ -19,9 +19,9 @@ class Settings:
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
     # ---------- OpenAI ----------
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     # vision-capable, cheap-ish model; you can override via env
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    # OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
 
 settings = Settings()

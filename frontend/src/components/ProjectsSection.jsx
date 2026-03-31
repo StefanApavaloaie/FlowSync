@@ -114,9 +114,9 @@ function ProjectsSection({ refreshKey = 0 }) {
 
     const [replyTo, setReplyTo] = useState(null);
 
-    const [aiSuggestions, setAiSuggestions] = useState(null);
-    const [loadingAi, setLoadingAi] = useState(false);
-    const [showAi, setShowAi] = useState(false);
+    // const [aiSuggestions, setAiSuggestions] = useState(null);
+    // const [loadingAi, setLoadingAi] = useState(false);
+    // const [showAi, setShowAi] = useState(false);
 
     // per-project invite input
     const [inviteEmails, setInviteEmails] = useState({});
@@ -277,8 +277,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setActiveAsset(null);
                 setComments([]);
                 setReplyTo(null);
-                setAiSuggestions(null);
-                setShowAi(false);
+                // setAiSuggestions(null);
+                // setShowAi(false);
             }
         } catch (err) {
             console.error("Failed to delete project", err);
@@ -376,8 +376,8 @@ function ProjectsSection({ refreshKey = 0 }) {
                 setActiveAsset(null);
                 setComments([]);
                 setReplyTo(null);
-                setAiSuggestions(null);
-                setShowAi(false);
+                // setAiSuggestions(null);
+                // setShowAi(false);
             }
         } catch (err) {
             console.error("Failed to leave project", err);
@@ -424,8 +424,8 @@ function ProjectsSection({ refreshKey = 0 }) {
         setActiveAsset(asset);
         setComments([]);
         setReplyTo(null);
-        setAiSuggestions(null);
-        setShowAi(false);
+        // setAiSuggestions(null);
+        // setShowAi(false);
 
         if (!asset) return;
 
@@ -525,8 +525,8 @@ function ProjectsSection({ refreshKey = 0 }) {
             setActiveAsset(null);
             setComments([]);
             setReplyTo(null);
-            setAiSuggestions(null);
-            setShowAi(false);
+            // setAiSuggestions(null);
+            // setShowAi(false);
         } catch (err) {
             console.error("Failed to delete asset", err);
 
@@ -576,6 +576,7 @@ function ProjectsSection({ refreshKey = 0 }) {
         }
     };
 
+    /*
     const fetchAiSuggestions = async () => {
         if (!activeAsset) return;
         setLoadingAi(true);
@@ -607,6 +608,7 @@ function ProjectsSection({ refreshKey = 0 }) {
             setShowAi((prev) => !prev);
         }
     };
+    */
 
     // ---- emoji reactions ----
 
