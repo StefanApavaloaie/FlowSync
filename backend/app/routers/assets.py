@@ -38,6 +38,12 @@ DOC_CONTENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # .docx
     "application/vnd.ms-excel",  # .xls
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
+    "image/vnd.dwg",  # .dwg
+    "application/acad",
+    "application/x-acad",
+    "application/autocad_dwg",
+    "application/dwg",
+    "application/x-dwg"
 }
 
 ALLOWED_CONTENT_TYPES = IMAGE_CONTENT_TYPES | DOC_CONTENT_TYPES
@@ -51,7 +57,9 @@ ALLOWED_EXTENSIONS = {
     ".doc",
     ".docx",
     ".xls",
+    ".xls",
     ".xlsx",
+    ".dwg",
 }
 
 
@@ -119,7 +127,7 @@ async def upload_asset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "Unsupported file type. "
-                "Allowed: PNG, JPG/JPEG, WEBP, PDF, Word (.doc/.docx), Excel (.xls/.xlsx)."
+                "Allowed: PNG, JPG/JPEG, WEBP, PDF, Word (.doc/.docx), Excel (.xls/.xlsx), AutoCAD (.dwg)."
             ),
         )
 
