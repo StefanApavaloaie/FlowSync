@@ -656,7 +656,7 @@ function ProjectsSection({ refreshKey = 0 }) {
         return { uploaderText, whenText };
     })();
 
-    const commentTree = buildCommentTree();
+    const commentTree = buildCommentTree(comments);
 
     return (
         <section className="fs-section-projects">

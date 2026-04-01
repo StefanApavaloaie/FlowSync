@@ -43,7 +43,9 @@ DOC_CONTENT_TYPES = {
     "application/x-acad",
     "application/autocad_dwg",
     "application/dwg",
-    "application/x-dwg"
+    "application/x-dwg",
+    "application/vnd.ms-powerpoint",  # .ppt
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation"  # .pptx
 }
 
 ALLOWED_CONTENT_TYPES = IMAGE_CONTENT_TYPES | DOC_CONTENT_TYPES
@@ -60,6 +62,8 @@ ALLOWED_EXTENSIONS = {
     ".xls",
     ".xlsx",
     ".dwg",
+    ".ppt",
+    ".pptx",
 }
 
 
@@ -122,21 +126,25 @@ async def upload_asset(
         db, current_user.id, project_id
     )
 
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Unsupported file type. "
-                "Allowed: PNG, JPG/JPEG, WEBP, PDF, Word (.doc/.docx), Excel (.xls/.xlsx), AutoCAD (.dwg)."
-            ),
-        )
-
     # Build filename base
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     original_name = file.filename or "asset"
     original_ext = os.path.splitext(original_name)[1].lower()
-    ext = original_ext if original_ext in ALLOWED_EXTENSIONS else ""
+    
+    # Check if extension is allowed
+    is_valid_ext = original_ext in ALLOWED_EXTENSIONS
+    is_valid_mime = file.content_type in ALLOWED_CONTENT_TYPES
 
+    if not (is_valid_ext or is_valid_mime):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Unsupported file type ({original_ext}). "
+                "Allowed: PNG, JPG/JPEG, WEBP, PDF, Word, Excel, AutoCAD (.dwg), PowerPoint."
+            ),
+        )
+
+    ext = original_ext
     filename = f"project_{project.id}_{timestamp}{ext}"
 
     if settings.CLOUDINARY_URL:

@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .. import models, schemas
 from ..deps import get_db, get_current_user_from_header
@@ -65,7 +65,7 @@ def list_comments(
 
     comments = (
         db.query(models.Comment)
-        .join(models.User, models.Comment.user_id == models.User.id)
+        .options(joinedload(models.Comment.user), joinedload(models.Comment.reactions))
         .filter(models.Comment.asset_id == asset_id)
         .order_by(models.Comment.created_at.asc())
         .all()
@@ -132,7 +132,13 @@ def add_comment(
     db.add(activity)
     db.commit()
 
-    return comment
+    # re-query to populate relationships (user, reactions) for the response
+    return (
+        db.query(models.Comment)
+        .options(joinedload(models.Comment.user), joinedload(models.Comment.reactions))
+        .filter(models.Comment.id == comment.id)
+        .first()
+    )
 
 
 

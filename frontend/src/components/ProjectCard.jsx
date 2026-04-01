@@ -152,7 +152,7 @@ export default function ProjectCard({
                     {uploadingFor === project.id ? "Uploading..." : "Upload asset"}
                     <input
                         type="file"
-                        accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                        accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.dwg"
                         style={{ display: "none" }}
                         onChange={(e) => onFileChange(project.id, e)}
                         disabled={uploadingFor === project.id || archived}
@@ -287,12 +287,12 @@ export default function ProjectCard({
                     {assets.map((asset) => {
                         const info = getFileInfo(asset);
                         const isImage = info.kind === "image";
-                        
+
                         // Use correct semantic colors mapping for pill-shaped statuses
                         const statusMapping = {
                             needs_feedback: { bg: "rgba(234, 179, 8, 0.2)", color: "#fef08a" },
                             in_progress: { bg: "rgba(59, 130, 246, 0.2)", color: "#bfdbfe" },
-                            changes_requested: { bg: "rgba(248, 113, 113, 0.2)", color: "#fecaca"},
+                            changes_requested: { bg: "rgba(248, 113, 113, 0.2)", color: "#fecaca" },
                             final: { bg: "rgba(34, 197, 94, 0.2)", color: "#bbf7d0" },
                         };
                         const styling = statusMapping[asset.status] || statusMapping["needs_feedback"];

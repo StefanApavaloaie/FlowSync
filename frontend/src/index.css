@@ -7,6 +7,31 @@
   padding: 0;
 }
 
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.2) rgba(15, 23, 42, 0.1);
+}
+
 html,
 body,
 #root {
@@ -15,20 +40,24 @@ body,
   font-family: "Plus Jakarta Sans", sans-serif;
   letter-spacing: -0.01em;
 }
-#root{
+
+#root {
   position: relative;
   z-index: 1;
 }
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   background: #0f172a;
   color: #e2e8f0;
 }
+
 .fs-bg-veil {
   position: fixed;
   inset: 0;
-  z-index: 0;          /* sub #root (care are 1) */
+  z-index: 0;
+  /* sub #root (care are 1) */
   pointer-events: none;
   overflow: hidden;
 }
@@ -38,6 +67,7 @@ body {
   height: 100%;
   display: block;
 }
+
 /* ---------- Layout shell ---------- */
 
 .fs-app-shell {
@@ -63,7 +93,7 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(12px);
--webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -126,7 +156,8 @@ body {
 
 /* Ghost button (header logout, etc.) */
 
-.fs-button-ghost, .fs-button-primary {
+.fs-button-ghost,
+.fs-button-primary {
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.5);
@@ -153,7 +184,7 @@ body {
   padding: 2.5rem 3vw 3rem;
   max-width: 1240 px;
   margin: 0 auto;
-  
+
 }
 
 /* ---------- Login page ---------- */
@@ -242,7 +273,7 @@ body {
   pointer-events: none;
 }
 
-.fs-hero > * {
+.fs-hero>* {
   position: relative;
 }
 
@@ -277,11 +308,9 @@ body {
 .fs-hero-secondary {
   font-size: 0.82rem;
   color: #e5e7eb;
-  background: radial-gradient(
-    circle at left,
-    rgba(59, 130, 246, 0.3),
-    rgba(15, 23, 42, 0.95)
-  );
+  background: radial-gradient(circle at left,
+      rgba(59, 130, 246, 0.3),
+      rgba(15, 23, 42, 0.95));
   border-radius: 999px;
   padding: 0.5rem 0.9rem;
   border: 1px solid rgba(96, 165, 250, 0.6);
@@ -311,6 +340,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
+
 .fs-create-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
@@ -426,11 +456,13 @@ body {
   transition: all 0.2s ease;
   animation: fadeSlideUp 0.4s ease-out forwards;
 }
+
 .fs-project-card:hover {
   transform: translateY(-2px);
   border-color: rgba(148, 163, 184, 0.3);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
+
 .fs-project-card-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -487,11 +519,14 @@ body {
   background: rgba(127, 29, 29, 0.4);
   color: #fecaca;
 }
-.fs-project-card label:hover, .fs-project-card button:hover{
-    background: rgba(15, 23, 42, 0.95);
+
+.fs-project-card label:hover,
+.fs-project-card button:hover {
+  background: rgba(15, 23, 42, 0.95);
   border-color: rgba(148, 163, 184, 0.9);
   transform: translateY(-1px);
 }
+
 /* Empty states */
 
 .fs-empty-card {
@@ -505,6 +540,7 @@ body {
   text-align: center;
   transition: border-color 0.3s ease, background 0.3s ease;
 }
+
 .fs-empty-card:hover {
   border-color: rgba(96, 165, 250, 0.5);
   background: rgba(30, 64, 175, 0.1);
@@ -538,9 +574,12 @@ body {
   .fs-hero {
     padding: 1.4rem 1.4rem 1.8rem;
   }
-  .fs-header-title-main, .fs-header-title-sub{
+
+  .fs-header-title-main,
+  .fs-header-title-sub {
     display: none
   }
+
   .fs-hero-title {
     font-size: 1.6rem;
     line-height: 1.2;
@@ -618,7 +657,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000; /* above header / content */
+  z-index: 1000;
+  /* above header / content */
 }
 
 .fs-modal {
@@ -664,6 +704,7 @@ body {
   background: linear-gradient(135deg, #1d4ed8, #2563eb);
   color: #ffffff;
 }
+
 .fs-modal-primary:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
@@ -675,7 +716,8 @@ body {
   color: #e5e7eb;
   border: 1px solid rgba(148, 163, 184, 0.7);
 }
-.fs-modal-secondary:hover{
+
+.fs-modal-secondary:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
 }
@@ -718,7 +760,8 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
 }
-.fs-project-menu-dropdown button:nth-child(-n+2){
+
+.fs-project-menu-dropdown button:nth-child(-n+2) {
   color: #fff
 }
 
@@ -744,7 +787,7 @@ body {
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.5);
   background: radial-gradient(circle at 20% 0, rgba(56, 189, 248, 0.28), transparent 55%),
-              rgba(15, 23, 42, 0.98);
+    rgba(15, 23, 42, 0.98);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -848,7 +891,8 @@ body {
   border: none;
 }
 
-.fs-invite-decline, .fs-invite-accept {
+.fs-invite-decline,
+.fs-invite-accept {
   background: transparent;
   border: 1px solid rgba(148, 163, 184, 0.8);
   color: #e5e7eb;
@@ -863,6 +907,7 @@ body {
 .fs-invite-accept:hover {
   box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6);
 }
+
 /* subtle shake on hover */
 .fs-bell-button:hover {
   box-shadow: 0 12px 30px rgba(37, 99, 235, 0.55);
@@ -872,28 +917,59 @@ body {
 
 /* keyframes for the shake */
 @keyframes fs-bell-shake {
-  0%   { transform: rotate(0deg); }
-  20%  { transform: rotate(-10deg); }
-  40%  { transform: rotate(8deg); }
-  60%  { transform: rotate(-6deg); }
-  80%  { transform: rotate(4deg); }
-  100% { transform: rotate(0deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(-10deg);
+  }
+
+  40% {
+    transform: rotate(8deg);
+  }
+
+  60% {
+    transform: rotate(-6deg);
+  }
+
+  80% {
+    transform: rotate(4deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
 }
+
 @keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 
 
 @media (max-width: 640px) {
   .fs-dropdown-card.fs-invites-dropdown {
-    position: fixed;                          /* detach from header wrapper */
-    top: 70px;                                /* just below the header */
-    right: 1rem;                              /* stick to screen right */
+    position: fixed;
+    /* detach from header wrapper */
+    top: 70px;
+    /* just below the header */
+    right: 1rem;
+    /* stick to screen right */
     left: auto;
-    margin-top: 0;                            /* no extra gap */
-    width: min(320px, calc(100% - 2rem));     /* fit nicely on small screens */
-    max-height: 60vh;                         /* avoid covering whole screen */
+    margin-top: 0;
+    /* no extra gap */
+    width: min(320px, calc(100% - 2rem));
+    /* fit nicely on small screens */
+    max-height: 60vh;
+    /* avoid covering whole screen */
   }
 }
